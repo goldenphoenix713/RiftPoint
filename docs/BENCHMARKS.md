@@ -52,6 +52,8 @@ Evaluates raw `put()` and `get_tuple()` read/write throughput and latency percen
 - **`RiftCheckpointSaver`:** Acquires fine-grained per-thread locks (`threading.Lock`), versions individual channels via typed byte serialization, and commits moments into the Janus Rust graph engine.
 - **Delta:** The overhead of full DAG lineage and concurrency safety in RiftPoint is only $\approx 4.8\,\mu\text{s}$ ($0.0048\text{ ms}$), creating negligible difference in full agent workflows.
 
+![Micro-Level Checkpoint Latency Distribution](images/benchmark_micro_latency.png)
+
 ---
 
 ### 2. Candidate Branch Forking Scalability (The $928\times$ Speedup)
@@ -85,6 +87,8 @@ Forking Latency Comparison (100 Speculative Branches)
   RiftPoint (CoW)       ▏ 0.41 ms (🔥 928.1x faster — O(1) constant time)
 ─────────────────────────────────────────────────────────────────────────────
 ```
+
+![Branch Forking Scalability and Speedup Factor](images/benchmark_forking_speedup.png)
 
 #### Analysis: $O(N \cdot S)$ Deepcopy vs $O(1)$ Copy-on-Write Pointer Sharing
 

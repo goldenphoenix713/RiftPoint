@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import gc
 import statistics
+import sys
 import time
 import tracemalloc
 from concurrent.futures import ThreadPoolExecutor
@@ -839,6 +840,25 @@ def main() -> None:
     _print_fork_scaling(fork_results)
     _print_orchestration_and_capabilities(orch_res, tot_res, tt_res, std_iso=std_iso)
     _print_summary_verdict()
+
+    if "--plot" in sys.argv or "--save-plots" in sys.argv:
+        try:
+            try:
+                from generate_benchmark_charts import (  # noqa: PLC0415
+                    generate_forking_speedup_chart,
+                    generate_micro_latency_chart,
+                )
+            except ImportError:
+                from scripts.generate_benchmark_charts import (  # noqa: PLC0415
+                    generate_forking_speedup_chart,
+                    generate_micro_latency_chart,
+                )
+
+            p1 = generate_forking_speedup_chart(fork_results)
+            p2 = generate_micro_latency_chart(mem_put, rift_put, mem_get, rift_get)
+            print(f"\n📊 Generated publication-quality figures: {p1} and {p2}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"\n⚠️  Could not generate plots: {exc}")
 
 
 if __name__ == "__main__":
