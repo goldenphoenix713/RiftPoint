@@ -6,6 +6,7 @@ relative to standard LangGraph checkpointers.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import TYPE_CHECKING, Any, TypedDict
 
@@ -286,3 +287,133 @@ async def test_async_speculative_branching_budget() -> None:
     assert duration < 1.0, (
         f"Async branching duration {duration:.3f}s exceeded 1.0s limit"
     )
+
+
+@pytest.mark.anyio
+async def test_speculative_tool_racing_simulation() -> None:
+    """Verify concurrent heterogeneous tool racing speedup and collapse."""
+    saver = AsyncRiftCheckpointSaver()
+
+    class SimState(TypedDict):
+        action: str
+        context: list[str]
+        score: float
+        status: str
+
+    builder = StateGraph(SimState)
+
+    async def mock_tool(state: SimState) -> dict[str, Any]:
+        act = state.get("action", "")
+        latencies = {
+            "local_cache": 0.005,
+            "vector_search": 0.020,
+            "sql_db": 0.025,
+            "web_search": 0.040,
+        }
+        await asyncio.sleep(latencies.get(act, 0.01))
+        scores = {
+            "local_cache": 5.0,
+            "vector_search": 7.5,
+            "sql_db": 8.0,
+            "web_search": 9.2,
+        }
+        return {
+            "action": act,
+            "context": [*state.get("context", []), f"{act}_payload"],
+            "score": scores.get(act, 1.0),
+            "status": "success",
+        }
+
+    builder.add_node("exec", mock_tool)
+    builder.add_edge(START, "exec")
+    graph = builder.compile(checkpointer=saver)
+
+    thread_id = "test-sim-tool-race"
+    cfg: RunnableConfig = {"configurable": {"thread_id": thread_id}}
+    await graph.ainvoke(
+        {"action": "seed", "context": ["init"], "score": 0.0, "status": "init"},
+        config=cfg,
+    )
+
+    runner = RiftRunner(saver=saver)
+    resolver = MultiverseResolver(saver=saver, branch_manager=runner.branch_manager)
+
+    actions = ["local_cache", "vector_search", "sql_db", "web_search"]
+    specs = [
+        BranchSpec(name=a, input_data={"action": a, "context": [f"{a}_call"]})
+        for a in actions
+    ]
+
+    t0 = time.perf_counter()
+    results = await runner.arun_parallel_branches(
+        graph=graph, initial_config=cfg, branch_specs=specs
+    )
+    collapse_res = await resolver.acollapse(
+        thread_id=thread_id,
+        results=results,
+        evaluator=HeuristicEvaluator(
+            scorer=lambda r: float(r.output.get("score", 0.0) if r.output else 0.0)
+        ),
+        prune_discarded=True,
+    )
+    dur = time.perf_counter() - t0
+
+    assert collapse_res.winning_branch == "web_search"
+    assert collapse_res.scores["web_search"].score == pytest.approx(9.2, abs=0.01)
+    assert dur < 0.25
+    remaining = runner.branch_manager.list_branches(thread_id)
+    assert "local_cache" not in remaining
+    assert "vector_search" not in remaining
+    assert "sql_db" not in remaining
+
+
+@pytest.mark.anyio
+async def test_speculative_tool_racing_fault_tolerance() -> None:
+    """Verify speculative racing gracefully ignores failed branches and auto-prunes."""
+    saver = AsyncRiftCheckpointSaver()
+
+    class FaultState(TypedDict):
+        tool: str
+        status: str
+
+    builder = StateGraph(FaultState)
+
+    def tool_exec(state: FaultState) -> dict[str, Any]:
+        if state.get("tool") == "flaky_api":
+            msg = "503 Service Unavailable"
+            raise RuntimeError(msg)
+        return {"tool": state.get("tool", ""), "status": "ok"}
+
+    builder.add_node("exec", tool_exec)
+    builder.add_edge(START, "exec")
+    graph = builder.compile(checkpointer=saver)
+
+    thread_id = "test-fault-tolerance"
+    cfg: RunnableConfig = {"configurable": {"thread_id": thread_id}}
+    await graph.ainvoke({"tool": "seed", "status": "init"}, config=cfg)
+
+    runner = RiftRunner(saver=saver)
+    resolver = MultiverseResolver(saver=saver, branch_manager=runner.branch_manager)
+
+    specs = [
+        BranchSpec(name="flaky_branch", input_data={"tool": "flaky_api"}),
+        BranchSpec(name="healthy_branch", input_data={"tool": "healthy_db"}),
+    ]
+
+    results = await runner.arun_parallel_branches(
+        graph=graph, initial_config=cfg, branch_specs=specs
+    )
+    assert not results["flaky_branch"].is_success
+    assert results["flaky_branch"].error is not None
+    assert results["healthy_branch"].is_success
+
+    collapse_res = await resolver.acollapse(
+        thread_id=thread_id,
+        results=results,
+        evaluator=HeuristicEvaluator(scorer=lambda r: 10.0 if r.is_success else 0.0),
+        prune_discarded=True,
+    )
+
+    assert collapse_res.winning_branch == "healthy_branch"
+    # Ensure discarded branches were pruned from checkpoint storage
+    assert "flaky_branch" not in runner.branch_manager.list_branches(thread_id)

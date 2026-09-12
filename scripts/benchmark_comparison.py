@@ -52,6 +52,15 @@ class BenchState(TypedDict):
     scratchpad: dict[str, Any]
 
 
+class ToolRacingState(TypedDict):
+    """Speculative tool racing agent state schema."""
+
+    action: str
+    context: list[str]
+    score: float
+    status: str
+
+
 def create_bench_graph(saver: BaseCheckpointSaver[Any]) -> Any:
     """Compile a 2-node linear state graph for benchmarking."""
     builder = StateGraph(BenchState)
@@ -73,6 +82,40 @@ def create_bench_graph(saver: BaseCheckpointSaver[Any]) -> Any:
     builder.add_edge(START, "node_a")
     builder.add_edge("node_a", "node_b")
 
+    return builder.compile(checkpointer=saver)
+
+
+async def _mock_tool_node(state: ToolRacingState) -> dict[str, Any]:
+    """Simulate realistic tool latency and response quality scoring."""
+    action = state.get("action", "unknown")
+    latency_map = {
+        "local_cache": 0.005,
+        "vector_search": 0.035,
+        "sql_db": 0.045,
+        "speculative_llm": 0.060,
+        "web_search": 0.085,
+    }
+    await asyncio.sleep(latency_map.get(action, 0.010))
+    score_map = {
+        "local_cache": 5.0,
+        "vector_search": 7.5,
+        "sql_db": 8.0,
+        "speculative_llm": 8.5,
+        "web_search": 9.2,
+    }
+    return {
+        "action": action,
+        "context": [*state.get("context", []), f"{action}_snippet_payload"],
+        "score": score_map.get(action, 1.0),
+        "status": "success",
+    }
+
+
+def create_tool_racing_graph(saver: Any) -> Any:
+    """Compile a single-node asynchronous tool execution graph."""
+    builder = StateGraph(ToolRacingState)
+    builder.add_node("execute_tool", _mock_tool_node)
+    builder.add_edge(START, "execute_tool")
     return builder.compile(checkpointer=saver)
 
 
@@ -1128,6 +1171,140 @@ def _print_async_benchmarks(
     )
 
 
+async def run_speculative_tool_racing_benchmark() -> dict[str, Any]:
+    """Benchmark speculative tool racing vs sequential execution."""
+    gc.collect()
+    # 1. Sequential Execution Simulation (Fallback Chain)
+    seq_saver = AsyncRiftCheckpointSaver()
+    seq_graph = create_tool_racing_graph(seq_saver)
+    seq_tid = "racing-seq-thread"
+    seq_cfg: RunnableConfig = {"configurable": {"thread_id": seq_tid}}
+    await seq_graph.ainvoke(
+        {"action": "seed", "context": ["user_query"], "score": 0.0, "status": "init"},
+        config=seq_cfg,
+    )
+
+    strategies_order = [
+        "local_cache",
+        "vector_search",
+        "sql_db",
+        "speculative_llm",
+        "web_search",
+    ]
+    t0 = time.perf_counter()
+    for strat in strategies_order:
+        input_payload: ToolRacingState = {
+            "action": strat,
+            "context": [f"{strat}_call"],
+            "score": 0.0,
+            "status": "run",
+        }
+        _ = await seq_graph.ainvoke(input_payload, config=seq_cfg)
+    seq_dur = time.perf_counter() - t0
+
+    # 2. RiftPoint Parallel Speculative Tool Racing & Multiverse Collapse
+    par_saver = AsyncRiftCheckpointSaver()
+    par_graph = create_tool_racing_graph(par_saver)
+    par_tid = "racing-par-thread"
+    par_cfg: RunnableConfig = {"configurable": {"thread_id": par_tid}}
+    await par_graph.ainvoke(
+        {"action": "seed", "context": ["user_query"], "score": 0.0, "status": "init"},
+        config=par_cfg,
+    )
+
+    runner = RiftRunner(saver=par_saver)
+    resolver = MultiverseResolver(saver=par_saver)
+    specs = [
+        BranchSpec(name=s, input_data={"action": s, "context": [f"{s}_call"]})
+        for s in strategies_order
+    ]
+
+    t1 = time.perf_counter()
+    b_results = await runner.arun_parallel_branches(
+        graph=par_graph, initial_config=par_cfg, branch_specs=specs
+    )
+    evaluator = HeuristicEvaluator(
+        scorer=lambda r: float(r.output.get("score", 0.0) if r.output else 0.0)
+    )
+    collapse_res = await resolver.acollapse(
+        thread_id=par_tid,
+        results=b_results,
+        evaluator=evaluator,
+        prune_discarded=True,
+    )
+    par_dur = time.perf_counter() - t1
+
+    speedup = (seq_dur / par_dur) if par_dur > 0 else 1.0
+    winner_name = collapse_res.winning_branch
+
+    strategies_meta = [
+        {
+            "name": "Local Cache",
+            "latency_ms": 5.0,
+            "score": 5.0,
+            "is_winner": winner_name == "local_cache",
+        },
+        {
+            "name": "Vector Search",
+            "latency_ms": 35.0,
+            "score": 7.5,
+            "is_winner": winner_name == "vector_search",
+        },
+        {
+            "name": "Postgres SQL",
+            "latency_ms": 45.0,
+            "score": 8.0,
+            "is_winner": winner_name == "sql_db",
+        },
+        {
+            "name": "Speculative LLM",
+            "latency_ms": 60.0,
+            "score": 8.5,
+            "is_winner": winner_name == "speculative_llm",
+        },
+        {
+            "name": "Web Search (Live)",
+            "latency_ms": 85.0,
+            "score": 9.2,
+            "is_winner": winner_name == "web_search",
+        },
+    ]
+
+    return {
+        "sequential_ms": seq_dur * 1000,
+        "parallel_ms": par_dur * 1000,
+        "speedup": speedup,
+        "winner": winner_name,
+        "winner_score": collapse_res.scores[winner_name].score,
+        "strategies": strategies_meta,
+    }
+
+
+def _print_tool_racing_benchmark(racing_res: dict[str, Any]) -> None:
+    """Print real-world speculative tool racing comparison table."""
+    print("\n6. 🏎️  Real-World Speculative Tool Racing Simulation:")
+    print(
+        f"   {'Execution Strategy':<26} | {'Total Latency':<16} | "
+        f"{'Winner Strategy':<20} | {'Speedup'}"
+    )
+    print(f"   {'-' * 26} | {'-' * 16} | {'-' * 20} | {'-' * 10}")
+    print(
+        f"   {'Sequential Fallback Loop':<26} | "
+        f"{racing_res['sequential_ms']:<14.2f}ms | "
+        f"{'web_search':<20} | 1.0x (baseline)"
+    )
+    print(
+        f"   {'RiftPoint Speculative Race':<26} | "
+        f"{racing_res['parallel_ms']:<14.2f}ms | "
+        f"{racing_res['winner']:<20} | "
+        f"🔥 {racing_res['speedup']:<4.2f}x faster"
+    )
+    print("\n   Candidate Tool Strategy Profile (Concurrent Execution):")
+    for s in racing_res["strategies"]:
+        badge = "🏆 Winner" if s.get("is_winner") else f"Score: {s['score']:.1f}"
+        print(f"   • {s['name']:<20} | Latency: ~{s['latency_ms']:<3.0f}ms | {badge}")
+
+
 def _print_summary_verdict() -> None:
     """Print the final executive summary verdict."""
     print("\n" + "=" * 86)
@@ -1144,6 +1321,10 @@ def _print_summary_verdict() -> None:
     print(
         " • Declarative Speculation: Replaces dozens of lines of manual "
         "thread management with `RiftRunner`."
+    )
+    print(
+        " • Speculative Tool Racing: Concurrent tool calls with automated collapse "
+        "and instant multi-fold speedups."
     )
     print(
         " • Automated Collapse: Native scoring (`JSONSchema`, `Heuristic`, "
@@ -1179,6 +1360,7 @@ def _maybe_generate_charts(
         tuple[float, dict[str, float]],
     ],
     async_scaling: list[dict[str, Any]],
+    racing_res: dict[str, Any],
 ) -> None:
     """Generate high-resolution benchmark visualization figures if requested."""
     if "--plot" not in sys.argv and "--save-plots" not in sys.argv:
@@ -1190,19 +1372,22 @@ def _maybe_generate_charts(
                 generate_async_performance_chart,
                 generate_forking_speedup_chart,
                 generate_micro_latency_chart,
+                generate_tool_racing_chart,
             )
         except ImportError:
             from generate_benchmark_charts import (  # type: ignore[import-not-found,no-redef] # noqa: PLC0415
                 generate_async_performance_chart,
                 generate_forking_speedup_chart,
                 generate_micro_latency_chart,
+                generate_tool_racing_chart,
             )
 
         mem_put, rift_put, mem_get, rift_get = sync_micro
         p1 = generate_forking_speedup_chart(fork_results)
         p2 = generate_micro_latency_chart(mem_put, rift_put, mem_get, rift_get)
         p3 = generate_async_performance_chart(async_micro, async_scaling)
-        print(f"\n📊 Generated publication-quality figures: {p1}, {p2}, and {p3}")
+        p4 = generate_tool_racing_chart(racing_res)
+        print(f"\n📊 Generated figures: {p1}, {p2}, {p3}, and {p4}")
     except Exception as exc:  # noqa: BLE001
         print(f"\n⚠️  Could not generate plots: {exc}")
 
@@ -1254,6 +1439,10 @@ def main() -> None:
         run_all_async_benchmarks()
     )
 
+    # 5. Real-World Speculative Tool Racing Simulation
+    print("\n[Sim 1/1] Real-World Speculative Tool Racing (5 Heterogeneous Tools)...")
+    racing_res = asyncio.run(run_speculative_tool_racing_benchmark())
+
     # PRINT SUMMARY REPORT
     print("\n" + "=" * 86)
     print("📊 BENCHMARK & CAPABILITY REPORT")
@@ -1263,6 +1452,7 @@ def main() -> None:
     _print_fork_scaling(fork_results)
     _print_orchestration_and_capabilities(orch_res, tot_res, tt_res, std_iso=std_iso)
     _print_async_benchmarks(async_micro, async_scaling, async_orch, async_tot)
+    _print_tool_racing_benchmark(racing_res)
     _print_summary_verdict()
 
     sync_micro = (mem_put, rift_put, mem_get, rift_get)
@@ -1271,6 +1461,7 @@ def main() -> None:
         sync_micro,
         async_micro,
         async_scaling,
+        racing_res,
     )
 
 

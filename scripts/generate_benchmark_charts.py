@@ -365,3 +365,103 @@ def generate_async_performance_chart(
     plt.savefig(out_p, dpi=300, bbox_inches="tight")
     plt.close(fig)
     return out_p
+
+
+def generate_tool_racing_chart(
+    racing_res: dict[str, Any],
+    output_path: Path | str = "docs/images/benchmark_tool_racing.png",
+) -> Path:
+    """Generate plots comparing sequential tool calling vs RiftPoint speculative racing.
+
+    Args:
+        racing_res: Speculative tool racing benchmark metrics dict.
+        output_path: Destination image path.
+
+    Returns:
+        Path to saved figure.
+    """
+    _apply_plot_theme()
+    out_p = Path(output_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.2))
+
+    # Subplot 1: Total End-to-End Latency
+    categories = [
+        "Sequential Tool\nFallback Loop",
+        "RiftPoint Speculative\nTool Racing",
+    ]
+    times = [racing_res["sequential_ms"], racing_res["parallel_ms"]]
+    colors = ["#f43f5e", "#10b981"]
+
+    bars1 = ax1.bar(categories, times, color=colors, width=0.45, edgecolor="#0f172a")
+    ax1.set_ylabel("Total Latency to Best Answer (ms)")
+    ax1.set_title(
+        "End-to-End Wall-Clock Latency: Sequential vs Speculative Racing",
+        fontweight="bold",
+    )
+
+    for bar, val in zip(bars1, times, strict=True):
+        ax1.annotate(
+            f"{val:.1f} ms",
+            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+            xytext=(0, 4),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            fontweight="bold",
+            color="#0f172a",
+        )
+
+    speedup = racing_res["speedup"]
+    box_props = {
+        "boxstyle": "round,pad=0.5",
+        "facecolor": "#d1fae5",
+        "edgecolor": "#10b981",
+    }
+    ax1.text(
+        0.5,
+        max(times) * 0.75,
+        f"{speedup:.2f}x Faster\nwith RiftPoint",
+        ha="center",
+        va="center",
+        fontsize=11,
+        fontweight="bold",
+        bbox=box_props,
+    )
+
+    # Subplot 2: Multi-Strategy Tool Profile (Latency & Quality Score)
+    strategies: list[dict[str, Any]] = racing_res.get("strategies", [])
+    names = [s["name"] for s in strategies]
+    latencies = [s["latency_ms"] for s in strategies]
+    scores = [s["score"] for s in strategies]
+
+    y_pos = range(len(names))
+    ax2.barh(list(y_pos), latencies, color="#38bdf8", alpha=0.85, edgecolor="#0284c7")
+    ax2.set_yticks(list(y_pos))
+    ax2.set_yticklabels(names)
+    ax2.set_xlabel("Individual Tool API Latency (ms)")
+    ax2.set_title(
+        "Candidate Strategies: API Latency & Evaluation Quality Score",
+        fontweight="bold",
+    )
+
+    for i, (lat, score) in enumerate(zip(latencies, scores, strict=True)):
+        badge = "★ Winner" if strategies[i].get("is_winner") else f"Score: {score:.1f}"
+        ax2.annotate(
+            f" {lat:.0f}ms | {badge}",
+            xy=(lat, i),
+            xytext=(3, 0),
+            textcoords="offset points",
+            ha="left",
+            va="center",
+            fontsize=9,
+            fontweight="bold",
+            color="#0369a1" if not strategies[i].get("is_winner") else "#047857",
+        )
+
+    plt.tight_layout()
+    plt.savefig(out_p, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    return out_p
