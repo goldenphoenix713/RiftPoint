@@ -8,11 +8,39 @@ authors = [
     { name = "Eduardo Ruiz", email = "eduardo.j.ruiz@gmail.com" },
 ]
 requires-python = ">=3.11"
-dependencies = [
-    "janus-tachyon-rs>=0.2.1",
-    "langchain-core>=1.6.3",
-    "langgraph>=1.2.11",
+keywords = [
+    "agentic-ai",
+    "checkpointer",
+    "janus",
+    "langchain",
+    "langgraph",
+    "multiverse",
+    "speculative-execution",
+    "state-management",
 ]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = [
+    "janus-tachyon-rs>=0.2.1,<0.3.0",
+    "langchain-core>=1.6.3,<2.0.0",
+    "langgraph>=1.2.11,<2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/goldenphoenix713/RiftPoint"
+Repository = "https://github.com/goldenphoenix713/RiftPoint"
+Issues = "https://github.com/goldenphoenix713/RiftPoint/issues"
+Documentation = "https://github.com/goldenphoenix713/RiftPoint#readme"
 
 [build-system]
 requires = ["uv_build>=0.10.0,<0.13.0"]
@@ -21,13 +49,21 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "certifi>=2026.7.22",
-    "mypy>=2.3.1",
-    "pre-commit>=4.0.0",
-    "pytest>=9.1.1",
-    "pytest-cov>=6.0.0",
-    "radon>=6.0.1",
-    "ruff>=0.16.7",
+    "mypy>=2.3.1,<3.0.0",
+    "pre-commit>=4.0.0,<5.0.0",
+    "pytest>=9.1.1,<10.0.0",
+    "pytest-cov>=6.0.0,<7.0.0",
+    "radon>=6.0.1,<7.0.0",
+    "ruff>=0.16.7,<1.0.0",
 ]
+
+# ==============================================================================
+# uv Configuration (Supply Chain Defense & Quarantine)
+# ==============================================================================
+[tool.uv]
+# Quarantine buffer: Ignore any package release newer than the cutoff timestamp
+exclude-newer = "2026-09-12T00:00:00Z"
+
 
 # ==============================================================================
 # Ruff Configuration (Linter & Formatter)
