@@ -14,6 +14,8 @@ from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from riftpoint.logger import logger
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from langchain_core.runnables import RunnableConfig
     from langgraph.checkpoint.base import (
         ChannelVersions,
@@ -203,6 +205,35 @@ class BaseRiftSaver:
             parent_config=parent_config,
             pending_writes=pending_writes,
         )
+
+    def _iter_ns_checkpoints(
+        self,
+        thread_id: str,
+        namespace: str,
+        filter_dict: dict[str, Any] | None,
+        before_id: str | None,
+    ) -> Iterator[CheckpointTuple]:
+        """Traverse checkpoints for a namespace in reverse chronological order."""
+        checkpoints = self._storage.get(thread_id, {}).get(namespace, {})
+        for chk_id in reversed(list(checkpoints.keys())):
+            if before_id and chk_id >= before_id:
+                continue
+
+            storage_entry = checkpoints[chk_id]
+            _, ser_meta, _ = storage_entry
+            meta_dict = cast(
+                "CheckpointMetadata",
+                self.serde.loads_typed(ser_meta),
+            )
+            if not self._matches_filter(meta_dict, filter_dict):
+                continue
+
+            yield self._build_checkpoint_tuple(
+                thread_id,
+                namespace,
+                chk_id,
+                storage_entry,
+            )
 
     def _matches_filter(
         self,
