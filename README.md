@@ -98,4 +98,7 @@ uv run python scripts/check_radon.py src
 
 ## 📄 License
 
-MIT / Apache-2.0
+This project is dual-licensed under:
+
+- **MIT License** ([LICENSE-MIT](file:///Users/eduardo.ruiz/PycharmProjects/RiftPoint/LICENSE-MIT))
+- **Apache License, Version 2.0** ([LICENSE-APACHE](file:///Users/eduardo.ruiz/PycharmProjects/RiftPoint/LICENSE-APACHE))

@@ -3,6 +3,10 @@ name = "riftpoint"
 version = "0.1.0"
 description = "High-performance multiversal checkpointer for LangGraph powered by Janus-Tachyon-RS"
 readme = "README.md"
+license = "MIT OR Apache-2.0"
+authors = [
+    { name = "Eduardo Ruiz", email = "eduardo.j.ruiz@gmail.com" },
+]
 requires-python = ">=3.11"
 dependencies = [
     "janus-tachyon-rs>=0.2.1",
