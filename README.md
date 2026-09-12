@@ -27,6 +27,7 @@ Detailed architectural blueprints and implementation phases are documented in [d
 
 - **[Master Architecture & Overview Plan](docs/planning/overview_plan.md)**
 - **[Performance Benchmarks & Multiverse Capability Report](docs/BENCHMARKS.md)**
+- **[Future Directions & Strategic Roadmap](docs/FUTURE_DIRECTIONS.md)**
 - **[Phase 1: Core Janus Bridge & Sync Checkpointer](docs/planning/phase_1_core_bridge_and_sync_checkpointer.md)**
 - **[Phase 2: Asynchronous Checkpointer](docs/planning/phase_2_async_checkpointer.md)**
 - **[Phase 3: Branching & Speculative Execution Engine](docs/planning/phase_3_branching_and_speculative_runner.md)**

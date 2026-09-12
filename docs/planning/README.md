@@ -32,3 +32,9 @@ Welcome to the planning and architecture hub for **RiftPoint**, the multiversal 
 5. **[Phase 5: Visualization, Serialization & Tracing](phase_5_visualization_and_serialization.md)**
    - Mermaid diagram generation and Matplotlib DAG rendering.
    - JSON, MsgPack, and binary state export/import.
+
+---
+
+## 🚀 Strategic Roadmap
+
+- **[Future Directions & Strategic Roadmap](../FUTURE_DIRECTIONS.md):** Autonomous tree search (Beam Search / MCTS), `@speculative_node` decorators, Pareto & consensus evaluators, timeline diffing, interactive visualizers, and streaming.
