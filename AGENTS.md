@@ -149,4 +149,4 @@ Agents and contributors modifying this codebase must adhere to the following rul
    - Respect Ruff configuration (double quotes, 4-space indentation, 88 character line width).
 
 5. **Markdown Quality:**
-   - Markdown documents must adhere to [`.markdownlintrc`](file:///.markdownlintrc) rules with no lint errors or missing blank lines around lists/blocks.
+   - Markdown documents must adhere to [`.markdownlintrc`](.markdownlintrc) rules with no lint errors or missing blank lines around lists/blocks.
