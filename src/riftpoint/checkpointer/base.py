@@ -235,6 +235,103 @@ class BaseRiftSaver:
                 storage_entry,
             )
 
+    def copy_checkpoint_entry(
+        self,
+        thread_id: str,
+        from_namespace: str,
+        to_namespace: str,
+        checkpoint_id: str,
+    ) -> bool:
+        """Copy a checkpoint entry and channel blobs across namespaces.
+
+        Args:
+            thread_id: Session thread ID.
+            from_namespace: Source namespace.
+            to_namespace: Destination namespace.
+            checkpoint_id: Checkpoint ID to copy.
+
+        Returns:
+            True if entry was found and copied, False otherwise.
+        """
+        source_storage = self._storage.get(thread_id, {}).get(from_namespace, {})
+        if checkpoint_id in source_storage:
+            entry = source_storage[checkpoint_id]
+            self._storage[thread_id][to_namespace][checkpoint_id] = entry
+
+            ser_chk, _, _ = entry
+            raw_chk = self.serde.loads_typed(ser_chk)
+            chk_dict = cast("Checkpoint", raw_chk)
+            for channel, version in chk_dict.get("channel_versions", {}).items():
+                src_key: BlobKey = (thread_id, from_namespace, channel, version)
+                if src_key in self._blobs:
+                    dst_key: BlobKey = (thread_id, to_namespace, channel, version)
+                    self._blobs[dst_key] = self._blobs[src_key]
+            return True
+        return False
+
+    def delete_namespace(self, thread_id: str, namespace: str) -> None:
+        """Purge a specific namespace from thread storage and channel blobs.
+
+        Args:
+            thread_id: Session thread ID.
+            namespace: Namespace to delete.
+        """
+        if thread_id in self._storage:
+            self._storage[thread_id].pop(namespace, None)
+
+        keys_to_remove = [
+            k for k in self._blobs if k[0] == thread_id and k[1] == namespace
+        ]
+        for k in keys_to_remove:
+            self._blobs.pop(k, None)
+
+    def commit_branch_to_canonical(
+        self,
+        thread_id: str,
+        branch_name: str,
+        checkpoint_id: str | None = None,
+    ) -> RunnableConfig:
+        """Promote a candidate branch state to canonical timeline (root namespace).
+
+        Args:
+            thread_id: Session thread ID.
+            branch_name: The candidate branch to commit.
+            checkpoint_id: Checkpoint ID to promote (defaults to latest in branch).
+
+        Returns:
+            RunnableConfig for the canonical timeline pointing to promoted checkpoint.
+        """
+        branch_ns = f"branch:{branch_name}"
+        target_id = checkpoint_id
+        if not target_id:
+            branch_checkpoints = self._storage.get(thread_id, {}).get(branch_ns, {})
+            if branch_checkpoints:
+                target_id = list(branch_checkpoints.keys())[-1]
+
+        if not target_id or not self.copy_checkpoint_entry(
+            thread_id, branch_ns, "", target_id
+        ):
+            msg = (
+                f"No checkpoint found in branch '{branch_name}' "
+                f"for thread '{thread_id}'"
+            )
+            raise ValueError(msg)
+
+        logger.info(
+            "Committed branch '%s' checkpoint '%s' to canonical timeline for '%s'",
+            branch_name,
+            target_id,
+            thread_id,
+        )
+
+        return {
+            "configurable": {
+                "thread_id": thread_id,
+                "checkpoint_ns": "",
+                "checkpoint_id": target_id,
+            }
+        }
+
     def _matches_filter(
         self,
         metadata: CheckpointMetadata,
