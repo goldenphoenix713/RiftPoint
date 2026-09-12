@@ -7,7 +7,9 @@ relative to standard LangGraph checkpointers.
 from __future__ import annotations
 
 import asyncio
+import gc
 import time
+import tracemalloc
 from typing import TYPE_CHECKING, Any, TypedDict
 
 import pytest
@@ -417,3 +419,63 @@ async def test_speculative_tool_racing_fault_tolerance() -> None:
     assert collapse_res.winning_branch == "healthy_branch"
     # Ensure discarded branches were pruned from checkpoint storage
     assert "flaky_branch" not in runner.branch_manager.list_branches(thread_id)
+
+
+def test_memory_and_gc_churn_budget() -> None:
+    """Verify memory stability and automatic branch pruning across iterative cycles."""
+    saver = RiftCheckpointSaver()
+    graph = create_bench_graph(saver)
+    thread_id = "test-mem-churn"
+    config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
+
+    # Seed initial state with ~50KB payload
+    payload = "x" * 50_000
+    _ = graph.invoke({"counter": 0, "data": [payload]}, config=config)
+
+    runner = RiftRunner(saver=saver)
+    resolver = MultiverseResolver(saver=saver, branch_manager=runner.branch_manager)
+
+    tracemalloc.start()
+    gc.collect()
+    _init_current, init_peak = tracemalloc.get_traced_memory()
+
+    # Run 5 iterative cycles of 10 branches each with pruning
+    for turn in range(5):
+        specs = [
+            BranchSpec(
+                name=f"t{turn}_b{b}",
+                input_data={"counter": b, "data": [f"spec_{b}"]},
+            )
+            for b in range(10)
+        ]
+        results = runner.run_parallel_branches(
+            graph=graph,
+            initial_config=config,
+            branch_specs=specs,
+        )
+        collapse_res = resolver.collapse(
+            thread_id=thread_id,
+            results=results,
+            evaluator=HeuristicEvaluator(
+                scorer=lambda r: float(r.output.get("counter", 0) if r.output else 0.0)
+            ),
+            prune_discarded=True,
+        )
+        assert collapse_res.winning_branch == f"t{turn}_b9"
+
+        # Verify discarded branches were pruned
+        active_branches = runner.branch_manager.list_branches(thread_id)
+        assert "main" in active_branches
+        assert f"t{turn}_b9" in active_branches
+        for b in range(9):
+            assert f"t{turn}_b{b}" not in active_branches
+
+    gc.collect()
+    _final_current, final_peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    # Residual memory increase across 5 cycles should remain strictly bounded (< 5MB)
+    net_increase_bytes = final_peak - init_peak
+    assert net_increase_bytes < 5 * 1024 * 1024, (
+        f"Memory increase {net_increase_bytes / 1024:.1f}KB exceeded 5MB threshold"
+    )

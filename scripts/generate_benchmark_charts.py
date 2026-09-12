@@ -448,7 +448,7 @@ def generate_tool_racing_chart(
     )
 
     for i, (lat, score) in enumerate(zip(latencies, scores, strict=True)):
-        badge = "★ Winner" if strategies[i].get("is_winner") else f"Score: {score:.1f}"
+        badge = "WINNER" if strategies[i].get("is_winner") else f"Score: {score:.1f}"
         ax2.annotate(
             f" {lat:.0f}ms | {badge}",
             xy=(lat, i),
@@ -460,6 +460,139 @@ def generate_tool_racing_chart(
             fontweight="bold",
             color="#0369a1" if not strategies[i].get("is_winner") else "#047857",
         )
+
+    plt.tight_layout()
+    plt.savefig(out_p, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    return out_p
+
+
+def _plot_peak_memory_bars(
+    ax: plt.Axes,
+    scaling_data: list[dict[str, Any]],
+) -> None:
+    """Plot peak memory allocation bar chart across state sizes."""
+    labels = [f"{s['size_kb']} KB" for s in scaling_data]
+    std_peaks = [s["std_peak_kb"] / 1024 for s in scaling_data]  # MB
+    rift_peaks = [s["rift_peak_kb"] / 1024 for s in scaling_data]  # MB
+
+    x = range(len(labels))
+    width = 0.35
+
+    bars1 = ax.bar(
+        [i - width / 2 for i in x],
+        std_peaks,
+        width,
+        label="Standard LangGraph (deepcopy)",
+        color="#f43f5e",
+        edgecolor="#be123c",
+        alpha=0.9,
+    )
+    bars2 = ax.bar(
+        [i + width / 2 for i in x],
+        rift_peaks,
+        width,
+        label="RiftPoint (CoW shared blobs)",
+        color="#10b981",
+        edgecolor="#047857",
+        alpha=0.95,
+    )
+
+    ax.set_xlabel("State Payload Size")
+    ax.set_ylabel("Peak Heap Allocation for 100 Branches (MB)")
+    ax.set_title(
+        "Peak Heap Memory Allocation (N=100 Candidate Branches)",
+        fontweight="bold",
+    )
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(labels)
+    ax.legend(loc="upper left")
+
+    for bar, val in zip(bars1, std_peaks, strict=True):
+        ax.annotate(
+            f"{val:.2f}MB",
+            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+            xytext=(0, 3),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=8.5,
+            fontweight="bold",
+            color="#be123c",
+        )
+    for bar, val in zip(bars2, rift_peaks, strict=True):
+        ax.annotate(
+            f"{val:.2f}MB",
+            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+            xytext=(0, 3),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=8.5,
+            fontweight="bold",
+            color="#047857",
+        )
+
+
+def _plot_multicycle_footprint_curve(
+    ax: plt.Axes,
+    cycle_data: dict[str, Any],
+) -> None:
+    """Plot multi-cycle residual memory footprint over 10 consecutive turns."""
+    turns = list(range(1, len(cycle_data.get("rift_finals_kb", [])) + 1))
+    std_cycle_finals = [v / 1024 for v in cycle_data.get("std_finals_kb", [])]
+    rift_cycle_finals = [v / 1024 for v in cycle_data.get("rift_finals_kb", [])]
+
+    if not turns:
+        return
+
+    ax.plot(
+        turns,
+        std_cycle_finals,
+        marker="o",
+        linewidth=2,
+        label="Standard LangGraph (Residual Heap)",
+        color="#f43f5e",
+    )
+    ax.plot(
+        turns,
+        rift_cycle_finals,
+        marker="s",
+        linewidth=2,
+        label="RiftPoint (Atomic Pruned)",
+        color="#10b981",
+    )
+
+    ax.set_xlabel("Iterative Speculative Turn (10 Branches / Turn)")
+    ax.set_ylabel("Residual Heap Memory (MB)")
+    ax.set_title(
+        "Multi-Cycle Memory Churn: 10 Consecutive Speculative Turns",
+        fontweight="bold",
+    )
+    ax.set_xticks(turns)
+    ax.legend(loc="upper left")
+
+
+def generate_memory_profiling_chart(
+    mem_res: dict[str, Any],
+    output_path: Path | str = "docs/images/benchmark_memory_gc_profile.png",
+) -> Path:
+    """Generate plots comparing memory allocation peak and multi-cycle GC churn.
+
+    Args:
+        mem_res: Memory and GC profiling benchmark metrics dict.
+        output_path: Destination image path.
+
+    Returns:
+        Path to saved figure.
+    """
+    _apply_plot_theme()
+    out_p = Path(output_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.2))
+    _plot_peak_memory_bars(ax1, mem_res.get("size_scaling", []))
+    _plot_multicycle_footprint_curve(ax2, mem_res.get("cycles", {}))
 
     plt.tight_layout()
     plt.savefig(out_p, dpi=300, bbox_inches="tight")

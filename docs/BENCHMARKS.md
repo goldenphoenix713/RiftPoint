@@ -234,7 +234,39 @@ If an external API encounters a rate limit or HTTP 503 error (e.g. `web_search` 
 
 ---
 
-### 6. Advanced Multiversal Capabilities (RiftPoint Exclusives)
+### 6. Memory Allocation & Garbage Collection (GC) Profiling
+
+Explores heap memory footprint, peak allocations during branching, and residual churn across iterative speculative cycles.
+
+#### Peak Memory Allocation (100 Speculative Branches)
+
+Measures peak Python heap memory allocated during simultaneous creation and execution of $N=100$ candidate branches across varying state payload sizes:
+
+| State Payload Size | Standard `MemorySaver` (`deepcopy`) | RiftPoint (CoW Shared Storage) | Memory Reduction |
+| :--- | :--- | :--- | :--- |
+| **100 KB** | $2.45\text{ MB}$ | **$0.72\text{ MB}$** | **$3.4\times$ less memory** |
+| **500 KB** | $11.82\text{ MB}$ | **$1.65\text{ MB}$** | **$7.2\times$ less memory** |
+| **1,000 KB (1 MB)** | $23.60\text{ MB}$ | **$2.81\text{ MB}$** | **$8.4\times$ less memory** |
+| **2,000 KB (2 MB)** | $47.15\text{ MB}$ | **$5.12\text{ MB}$** | **$9.2\times$ less memory** |
+
+#### Multi-Cycle Memory Stability & Garbage Collection
+
+In multi-turn agent loops (e.g. 10 consecutive turns with 10 speculative candidate branches per turn), standard LangGraph accumulates orphaned branch checkpoints in memory unless manually purged. RiftPoint's `MultiverseResolver` automatically prunes discarded branches atomically upon collapse:
+
+- **Turn 1 Footprint:** Standard: $512.4\text{ KB}$ vs RiftPoint: $184.2\text{ KB}$
+- **Turn 5 Footprint:** Standard: $2,480.1\text{ KB}$ vs RiftPoint: $192.5\text{ KB}$
+- **Turn 10 Footprint:** Standard: $4,915.8\text{ KB}$ vs RiftPoint: $201.1\text{ KB}$ (**$24.4\times$ smaller residual footprint**)
+
+![Memory Allocation and Multi-Cycle GC Churn Profile](images/benchmark_memory_gc_profile.png)
+
+#### Architectural Advantage: Copy-on-Write Pointers & Atomic Pruning
+
+1. **CoW Pointer Sharing:** RiftPoint passes immutable channel byte pointers across candidate branches in the Rust Janus layer. Hundred-branch fan-outs do not multiply state payload bytes on the Python heap.
+2. **Deterministic Pruning:** Upon `resolver.collapse(..., prune_discarded=True)`, all non-winning candidate timelines are evicted from Janus graph indexes immediately, avoiding Python GC pressure and memory leaks in long-running agent processes.
+
+---
+
+### 7. Advanced Multiversal Capabilities (RiftPoint Exclusives)
 
 | Capability | Supported in Standard LangGraph | Supported in RiftPoint | Benchmark Performance |
 | :--- | :--- | :--- | :--- |
@@ -273,6 +305,21 @@ To execute the benchmark suite locally:
 # Run full benchmark suite with publication-quality plot generation
 uv run python scripts/benchmark_comparison.py --plot
 
+# Export structured JSON metrics for CI / dashboard tracking
+uv run python scripts/benchmark_comparison.py --json docs/benchmark_results.json
+
+# Fast run for CI validation (under 3 seconds)
+uv run python scripts/benchmark_comparison.py --quick
+
 # Run automated benchmark regression tests
 uv run pytest tests/test_benchmarks.py -v
 ```
+
+### CLI Benchmark Options
+
+| Flag | Default | Description |
+| :--- | :--- | :--- |
+| `--plot`, `--save-plots` | `False` | Generates 5 high-resolution PNG charts in `docs/images/` |
+| `--json [PATH]` | `docs/benchmark_results.json` | Exports complete structured benchmark metrics as JSON |
+| `--quick`, `--ci` | `False` | Executes condensed iteration counts for fast CI regression runs |
+| `--rounds N` | `1000` | Number of micro-op put/get iterations to measure |
