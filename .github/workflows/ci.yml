@@ -45,6 +45,7 @@ jobs:
       - name: Markdownlint Check
         uses: DavidAnson/markdownlint-cli2-action@v19
         with:
+          config: ".markdownlint.json"
           globs: |
             **/*.md
             !.venv
