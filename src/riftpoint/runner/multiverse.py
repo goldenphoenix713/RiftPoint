@@ -114,6 +114,12 @@ class RiftRunner:
         """
         thread_id = initial_config["configurable"]["thread_id"]
         from_checkpoint = initial_config["configurable"].get("checkpoint_id")
+        if not from_checkpoint:
+            root_tuple = self.saver.get_tuple(
+                {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+            )
+            if root_tuple is not None:
+                from_checkpoint = root_tuple.config["configurable"].get("checkpoint_id")
 
         results: dict[str, BranchResult] = {}
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -187,6 +193,17 @@ class RiftRunner:
         """
         thread_id = initial_config["configurable"]["thread_id"]
         from_checkpoint = initial_config["configurable"].get("checkpoint_id")
+        if not from_checkpoint:
+            if hasattr(self.saver, "aget_tuple"):
+                root_tuple = await self.saver.aget_tuple(
+                    {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+                )
+            else:
+                root_tuple = self.saver.get_tuple(
+                    {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+                )
+            if root_tuple is not None:
+                from_checkpoint = root_tuple.config["configurable"].get("checkpoint_id")
 
         tasks = [
             self._execute_branch_async(graph, thread_id, from_checkpoint, spec)

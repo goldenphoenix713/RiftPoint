@@ -23,6 +23,19 @@ from riftpoint.runner import (
     BranchSpec,
     RiftRunner,
 )
+from riftpoint.serde import (
+    SessionSnapshot,
+    export_session_bytes,
+    export_session_json,
+    export_session_snapshot,
+    import_session_bytes,
+    import_session_json,
+    import_session_snapshot,
+)
+from riftpoint.visualization import (
+    plot_multiverse,
+    render_mermaid,
+)
 
 __version__ = "0.1.0"
 __all__ = [
@@ -42,6 +55,15 @@ __all__ = [
     "MultiverseResolver",
     "RiftCheckpointSaver",
     "RiftRunner",
+    "SessionSnapshot",
     "__version__",
+    "export_session_bytes",
+    "export_session_json",
+    "export_session_snapshot",
+    "import_session_bytes",
+    "import_session_json",
+    "import_session_snapshot",
     "logger",
+    "plot_multiverse",
+    "render_mermaid",
 ]

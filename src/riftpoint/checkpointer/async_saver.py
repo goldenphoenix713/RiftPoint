@@ -430,3 +430,54 @@ class AsyncRiftCheckpointSaver(BaseCheckpointSaver[str], BaseRiftSaver):
                     lines.append(f"    {parent_id} --> {chk_id}")
         lines.append("```")
         return "\n".join(lines)
+
+    async def aplot(
+        self,
+        thread_id: str,
+        *,
+        output_path: str | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Asynchronously render a plot of the multiversal DAG.
+
+        Args:
+            thread_id: Primary session thread ID.
+            output_path: Optional path to save figure.
+            **kwargs: Extra plotting options forwarded to Janus engine.
+
+        Returns:
+            Plot object.
+        """
+        return self.plot(thread_id, output_path=output_path, **kwargs)
+
+    async def aexport_session(
+        self,
+        thread_id: str,
+        file_path: str | None = None,
+    ) -> str:
+        """Asynchronously export session state as JSON string or file.
+
+        Args:
+            thread_id: Session thread ID.
+            file_path: Optional destination file path.
+
+        Returns:
+            JSON string representation of session snapshot.
+        """
+        lock = self._get_lock(thread_id)
+        async with lock:
+            return self.export_session(thread_id, file_path=file_path)
+
+    async def aimport_session(
+        self,
+        data: str,
+    ) -> str:
+        """Asynchronously import and restore session state from JSON.
+
+        Args:
+            data: JSON string content or path to file.
+
+        Returns:
+            Restored thread ID.
+        """
+        return self.import_session(data)

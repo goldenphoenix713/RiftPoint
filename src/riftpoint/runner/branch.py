@@ -55,12 +55,13 @@ class BranchManager:
             RunnableConfig configured for the new candidate branch.
         """
         checkpoint_ns = f"branch:{branch_name}"
+        branch_thread_id = f"{thread_id}:branch:{branch_name}"
         mv = self.saver.get_multiverse(thread_id)
 
         # 1. Resolve parent checkpoint
         parent_id = from_checkpoint
         if not parent_id:
-            root_tuple = self.saver.get_tuple(  # type: ignore[attr-defined]
+            root_tuple = self.saver.get_tuple(
                 {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
             )
             if root_tuple is not None:
@@ -78,8 +79,15 @@ class BranchManager:
                 exc,
             )
 
-        # 3. Seed the branch namespace in checkpointer storage if parent exists
+        # 3. Seed the branch namespace & thread storage if parent exists
         if parent_id:
+            self.saver.copy_checkpoint_entry_cross_thread(
+                from_thread_id=thread_id,
+                from_namespace="",
+                to_thread_id=branch_thread_id,
+                to_namespace="",
+                checkpoint_id=parent_id,
+            )
             self.saver.copy_checkpoint_entry(
                 thread_id=thread_id,
                 from_namespace="",
@@ -108,7 +116,7 @@ class BranchManager:
 
         config: RunnableConfig = {
             "configurable": {
-                "thread_id": thread_id,
+                "thread_id": branch_thread_id,
                 "checkpoint_ns": checkpoint_ns,
                 "checkpoint_id": parent_id,
             }
@@ -155,7 +163,10 @@ class BranchManager:
             thread_id: Session thread ID.
             branch_name: Branch name to delete.
         """
+        branch_thread_id = f"{thread_id}:branch:{branch_name}"
         checkpoint_ns = f"branch:{branch_name}"
+
+        self.saver.delete_thread(branch_thread_id)
         self.saver.delete_namespace(thread_id, checkpoint_ns)
 
         if thread_id in self._branches:

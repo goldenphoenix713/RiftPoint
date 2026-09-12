@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING, Any, cast
 
 from langgraph.checkpoint.base import (
@@ -41,6 +42,15 @@ class RiftCheckpointSaver(BaseCheckpointSaver[str], BaseRiftSaver):
         """
         BaseCheckpointSaver.__init__(self, serde=serde)
         BaseRiftSaver.__init__(self, serde=serde)
+        self._thread_locks: dict[str, threading.Lock] = {}
+        self._global_lock = threading.Lock()
+
+    def _get_thread_lock(self, thread_id: str) -> threading.Lock:
+        """Retrieve or create a threading.Lock for the specified thread ID."""
+        with self._global_lock:
+            if thread_id not in self._thread_locks:
+                self._thread_locks[thread_id] = threading.Lock()
+            return self._thread_locks[thread_id]
 
     def get_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
         """Retrieve a checkpoint tuple for the given configuration.
@@ -58,25 +68,26 @@ class RiftCheckpointSaver(BaseCheckpointSaver[str], BaseRiftSaver):
         ].get("checkpoint_id")
         checkpoint_id = str(raw_chk_id) if raw_chk_id is not None else None
 
-        thread_storage = self._storage.get(thread_id, {}).get(checkpoint_ns, {})
-        if not thread_storage:
-            return None
+        with self._get_thread_lock(thread_id):
+            thread_storage = self._storage.get(thread_id, {}).get(checkpoint_ns, {})
+            if not thread_storage:
+                return None
 
-        target_id: str | None = checkpoint_id
-        if not target_id:
-            # Default to the most recent checkpoint
-            target_id = list(thread_storage.keys())[-1]
+            target_id: str | None = checkpoint_id
+            if not target_id:
+                # Default to the most recent checkpoint
+                target_id = list(thread_storage.keys())[-1]
 
-        if target_id not in thread_storage:
-            return None
+            if target_id not in thread_storage:
+                return None
 
-        storage_entry = thread_storage[target_id]
-        return self._build_checkpoint_tuple(
-            thread_id,
-            checkpoint_ns,
-            target_id,
-            storage_entry,
-        )
+            storage_entry = thread_storage[target_id]
+            return self._build_checkpoint_tuple(
+                thread_id,
+                checkpoint_ns,
+                target_id,
+                storage_entry,
+            )
 
     def list(
         self,
@@ -106,22 +117,27 @@ class RiftCheckpointSaver(BaseCheckpointSaver[str], BaseRiftSaver):
         before_id = before["configurable"].get("checkpoint_id") if before else None
 
         for thread_id in thread_ids:
-            ns_dict = self._storage.get(thread_id, {})
-            checkpoint_ns = (
-                config["configurable"].get("checkpoint_ns", "") if config else None
-            )
-            namespaces = (
-                [checkpoint_ns] if checkpoint_ns is not None else list(ns_dict.keys())
-            )
+            with self._get_thread_lock(thread_id):
+                ns_dict = self._storage.get(thread_id, {})
+                checkpoint_ns = (
+                    config["configurable"].get("checkpoint_ns", "") if config else None
+                )
+                if checkpoint_ns is not None:
+                    namespaces = [checkpoint_ns]
+                else:
+                    namespaces = list(ns_dict.keys())
 
-            for ns in namespaces:
-                for tuple_item in self._iter_ns_checkpoints(
-                    thread_id, ns, filter, before_id
-                ):
-                    if limit is not None and yielded >= limit:
-                        return
-                    yield tuple_item
-                    yielded += 1
+                tuples_to_yield: list[CheckpointTuple] = []
+                for ns in namespaces:
+                    tuples_to_yield.extend(
+                        self._iter_ns_checkpoints(thread_id, ns, filter, before_id)
+                    )
+
+            for tuple_item in tuples_to_yield:
+                if limit is not None and yielded >= limit:
+                    return
+                yield tuple_item
+                yielded += 1
 
     def put(
         self,
@@ -148,22 +164,24 @@ class RiftCheckpointSaver(BaseCheckpointSaver[str], BaseRiftSaver):
 
         c_dict = dict(checkpoint)
         values = cast("dict[str, Any]", c_dict.pop("channel_values", {}))
-        self._store_blobs(thread_id, checkpoint_ns, values, new_versions)
 
-        stored_metadata = get_checkpoint_metadata(config, metadata)
-        stored_chk = cast("Checkpoint", c_dict)
-        self._storage[thread_id][checkpoint_ns][checkpoint_id] = (
-            self.serde.dumps_typed(stored_chk),
-            self.serde.dumps_typed(stored_metadata),
-            parent_checkpoint_id,
-        )
+        with self._get_thread_lock(thread_id):
+            self._store_blobs(thread_id, checkpoint_ns, values, new_versions)
 
-        # Record moment in Janus Multiverse DAG
-        self._record_janus_checkpoint(
-            thread_id,
-            checkpoint_id,
-            stored_metadata,
-        )
+            stored_metadata = get_checkpoint_metadata(config, metadata)
+            stored_chk = cast("Checkpoint", c_dict)
+            self._storage[thread_id][checkpoint_ns][checkpoint_id] = (
+                self.serde.dumps_typed(stored_chk),
+                self.serde.dumps_typed(stored_metadata),
+                parent_checkpoint_id,
+            )
+
+            # Record moment in Janus Multiverse DAG
+            self._record_janus_checkpoint(
+                thread_id,
+                checkpoint_id,
+                stored_metadata,
+            )
 
         return {
             "configurable": {
@@ -192,20 +210,21 @@ class RiftCheckpointSaver(BaseCheckpointSaver[str], BaseRiftSaver):
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = config["configurable"]["checkpoint_id"]
 
-        outer_key = (thread_id, checkpoint_ns, checkpoint_id)
-        existing_writes = self._writes[outer_key]
+        with self._get_thread_lock(thread_id):
+            outer_key = (thread_id, checkpoint_ns, checkpoint_id)
+            existing_writes = self._writes[outer_key]
 
-        for idx, (channel, value) in enumerate(writes):
-            inner_key = (task_id, WRITES_IDX_MAP.get(channel, idx))
-            if inner_key[1] >= 0 and inner_key in existing_writes:
-                continue
+            for idx, (channel, value) in enumerate(writes):
+                inner_key = (task_id, WRITES_IDX_MAP.get(channel, idx))
+                if inner_key[1] >= 0 and inner_key in existing_writes:
+                    continue
 
-            existing_writes[inner_key] = (
-                task_id,
-                channel,
-                self.serde.dumps_typed(value),
-                task_path,
-            )
+                existing_writes[inner_key] = (
+                    task_id,
+                    channel,
+                    self.serde.dumps_typed(value),
+                    task_path,
+                )
 
     def delete_thread(self, thread_id: str) -> None:
         """Delete all checkpoints, writes, and Janus state for a thread.
@@ -213,16 +232,20 @@ class RiftCheckpointSaver(BaseCheckpointSaver[str], BaseRiftSaver):
         Args:
             thread_id: The thread ID to purge.
         """
-        self._storage.pop(thread_id, None)
-        self._multiverses.pop(thread_id, None)
+        with self._get_thread_lock(thread_id):
+            self._storage.pop(thread_id, None)
+            self._multiverses.pop(thread_id, None)
 
-        for write_key in list(self._writes.keys()):
-            if write_key[0] == thread_id:
-                del self._writes[write_key]
+            for write_key in list(self._writes.keys()):
+                if write_key[0] == thread_id:
+                    del self._writes[write_key]
 
-        for blob_key in list(self._blobs.keys()):
-            if blob_key[0] == thread_id:
-                del self._blobs[blob_key]
+            for blob_key in list(self._blobs.keys()):
+                if blob_key[0] == thread_id:
+                    del self._blobs[blob_key]
+
+        with self._global_lock:
+            self._thread_locks.pop(thread_id, None)
 
     def visualize(self, thread_id: str) -> str:
         """Generate a Mermaid diagram representing the checkpoint history DAG.
