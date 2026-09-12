@@ -1,10 +1,14 @@
 [project]
 name = "riftpoint"
 version = "0.1.0"
-description = "Add your description here"
+description = "High-performance multiversal checkpointer for LangGraph powered by Janus-Tachyon-RS"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "janus-tachyon-rs>=0.2.1",
+    "langchain-core>=1.6.3",
+    "langgraph>=1.2.11",
+]
 
 [build-system]
 requires = ["uv_build>=0.10.0,<0.13.0"]
