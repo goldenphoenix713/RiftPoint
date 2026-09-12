@@ -153,8 +153,9 @@ known-first-party = ["riftpoint"]
 # Relax assertions and security false positives for tests
 "tests/**/*" = ["S101", "ARG", "FBT", "PLR2004", "S105", "S106", "INP001", "SLF001"]
 "test*" = ["S101", "ARG", "FBT", "PLR2004", "S105", "S106", "INP001", "SLF001"]
-# Allow print statements and standalone script execution in scripts
+# Allow print statements and standalone script execution in scripts & examples
 "scripts/**/*" = ["INP001", "T201"]
+"examples/**/*" = ["INP001", "T201", "S101"]
 
 [tool.ruff.format]
 quote-style = "double"
