@@ -9,10 +9,18 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any, TypedDict
 
+import pytest
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, StateGraph
 
-from riftpoint import BranchSpec, RiftCheckpointSaver, RiftRunner
+from riftpoint import (
+    AsyncRiftCheckpointSaver,
+    BranchSpec,
+    HeuristicEvaluator,
+    MultiverseResolver,
+    RiftCheckpointSaver,
+    RiftRunner,
+)
 
 if TYPE_CHECKING:
     from langchain_core.runnables import RunnableConfig
@@ -181,3 +189,100 @@ def test_memory_saver_vs_rift_parity() -> None:
 
     assert mem_state["counter"] == rift_state["counter"] == 1
     assert mem_state["data"] == rift_state["data"] == ["item"]
+
+
+@pytest.mark.anyio
+async def test_async_put_and_get_latency_budget() -> None:
+    """Verify AsyncRiftCheckpointSaver operations meet latency budgets."""
+    saver = AsyncRiftCheckpointSaver()
+    thread_id = "perf-async-put-get"
+    num_ops = 100
+
+    # 1. Measure aput
+    t0 = time.perf_counter()
+    for i in range(num_ops):
+        chk_id = f"1f1aef00-0000-0000-0000-{i:012d}"
+        cfg: RunnableConfig = {
+            "configurable": {
+                "thread_id": thread_id,
+                "checkpoint_ns": "",
+                "checkpoint_id": chk_id,
+            }
+        }
+        await saver.aput(
+            cfg,
+            {
+                "v": 1,
+                "id": chk_id,
+                "ts": "2026-09-12T00:00:00Z",
+                "channel_values": {"counter": i},
+                "channel_versions": {"counter": i},
+                "versions_seen": {},
+                "updated_channels": ["counter"],
+            },
+            {"step": i},
+            {"counter": i},
+        )
+    put_duration = time.perf_counter() - t0
+    avg_put_ms = (put_duration / num_ops) * 1000
+    assert avg_put_ms < 1.0, f"Async put latency {avg_put_ms:.3f}ms exceeded 1ms budget"
+
+    # 2. Measure aget_tuple
+    t1 = time.perf_counter()
+    for i in range(num_ops):
+        target_id = f"1f1aef00-0000-0000-0000-{i:012d}"
+        lookup_cfg: RunnableConfig = {
+            "configurable": {
+                "thread_id": thread_id,
+                "checkpoint_ns": "",
+                "checkpoint_id": target_id,
+            }
+        }
+        chk_tuple = await saver.aget_tuple(lookup_cfg)
+        assert chk_tuple is not None
+    get_duration = time.perf_counter() - t1
+    avg_get_ms = (get_duration / num_ops) * 1000
+    assert avg_get_ms < 0.5, (
+        f"Async get latency {avg_get_ms:.3f}ms exceeded 0.5ms budget"
+    )
+
+
+@pytest.mark.anyio
+async def test_async_speculative_branching_budget() -> None:
+    """Verify asynchronous parallel speculative branch creation and collapse."""
+    saver = AsyncRiftCheckpointSaver()
+    graph = create_bench_graph(saver)
+    thread_id = "perf-async-branching"
+    config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
+
+    # Seed
+    _ = await graph.ainvoke({"counter": 0, "data": []}, config=config)
+
+    runner = RiftRunner(saver=saver)
+    resolver = MultiverseResolver(saver=saver)
+    num_branches = 20
+    specs = [
+        BranchSpec(name=f"async_branch_{i}", input_data={"data": [f"spec_{i}"]})
+        for i in range(num_branches)
+    ]
+
+    start_time = time.perf_counter()
+    results = await runner.arun_parallel_branches(
+        graph=graph,
+        initial_config=config,
+        branch_specs=specs,
+    )
+    collapse_res = await resolver.acollapse(
+        thread_id=thread_id,
+        results=results,
+        evaluator=HeuristicEvaluator(scorer=lambda _r: 1.0),
+        prune_discarded=True,
+    )
+    duration = time.perf_counter() - start_time
+
+    assert len(results) == num_branches
+    assert all(r.is_success for r in results.values())
+    assert collapse_res.winning_branch.startswith("async_branch_")
+    assert duration < 1.0, (
+        f"Async branching duration {duration:.3f}s exceeded 1.0s limit"
+    )

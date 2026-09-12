@@ -7,6 +7,7 @@ historical time-travel rewind, and concurrency state isolation.
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import gc
 import statistics
@@ -20,6 +21,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, StateGraph
 
 from riftpoint import (
+    AsyncRiftCheckpointSaver,
     BranchSpec,
     HeuristicEvaluator,
     JSONSchemaEvaluator,
@@ -634,6 +636,319 @@ def run_state_isolation_test() -> tuple[bool, bool]:
     return std_is_isolated, rift_is_isolated
 
 
+async def run_async_put_benchmark(
+    saver: Any,
+    num_ops: int = 1000,
+) -> tuple[float, dict[str, float]]:
+    """Measure asynchronous put throughput and latency percentiles in microseconds."""
+    gc.collect()
+    thread_id = f"bench-aput-{type(saver).__name__}"
+    latencies: list[float] = []
+
+    start_total = time.perf_counter()
+    for i in range(num_ops):
+        chk_id = f"1f1aef00-0000-0000-0000-{i:012d}"
+        config: RunnableConfig = {
+            "configurable": {
+                "thread_id": thread_id,
+                "checkpoint_ns": "",
+                "checkpoint_id": chk_id,
+            }
+        }
+        chk_data: Checkpoint = {
+            "v": 1,
+            "id": chk_id,
+            "ts": "2026-09-12T00:00:00Z",
+            "channel_values": {"counter": i, "payload": f"item_{i}"},
+            "channel_versions": {"counter": i, "payload": i},
+            "versions_seen": {},
+            "updated_channels": ["counter", "payload"],
+        }
+        metadata: CheckpointMetadata = {"step": i}
+        versions: ChannelVersions = {"counter": i, "payload": i}
+
+        t0 = time.perf_counter()
+        await saver.aput(config, chk_data, metadata, versions)
+        latencies.append((time.perf_counter() - t0) * 1_000_000)
+
+    total_time = time.perf_counter() - start_total
+    ops_sec = num_ops / total_time
+    p50 = statistics.median(latencies)
+    p95 = statistics.quantiles(latencies, n=20)[18]
+    p99 = statistics.quantiles(latencies, n=100)[98]
+
+    return ops_sec, {
+        "mean_us": statistics.mean(latencies),
+        "p50_us": p50,
+        "p95_us": p95,
+        "p99_us": p99,
+        "total_s": total_time,
+    }
+
+
+async def run_async_get_benchmark(
+    saver: Any,
+    num_ops: int = 1000,
+) -> tuple[float, dict[str, float]]:
+    """Measure asynchronous aget_tuple lookup throughput and latency."""
+    thread_id = f"bench-aget-{type(saver).__name__}"
+    for i in range(100):
+        chk_id = f"1f1aef00-0000-0000-0000-{i:012d}"
+        config: RunnableConfig = {
+            "configurable": {
+                "thread_id": thread_id,
+                "checkpoint_ns": "",
+                "checkpoint_id": chk_id,
+            }
+        }
+        chk_seed: Checkpoint = {
+            "v": 1,
+            "id": chk_id,
+            "ts": "2026-09-12T00:00:00Z",
+            "channel_values": {"counter": i},
+            "channel_versions": {"counter": i},
+            "versions_seen": {},
+            "updated_channels": ["counter"],
+        }
+        meta_seed: CheckpointMetadata = {"step": i}
+        ver_seed: ChannelVersions = {"counter": i}
+        await saver.aput(config, chk_seed, meta_seed, ver_seed)
+
+    gc.collect()
+    latencies: list[float] = []
+    start_total = time.perf_counter()
+
+    for i in range(num_ops):
+        target_id = f"1f1aef00-0000-0000-0000-{(i % 100):012d}"
+        lookup_cfg: RunnableConfig = {
+            "configurable": {
+                "thread_id": thread_id,
+                "checkpoint_ns": "",
+                "checkpoint_id": target_id,
+            }
+        }
+        t0 = time.perf_counter()
+        _ = await saver.aget_tuple(lookup_cfg)
+        latencies.append((time.perf_counter() - t0) * 1_000_000)
+
+    total_time = time.perf_counter() - start_total
+    ops_sec = num_ops / total_time
+
+    return ops_sec, {
+        "mean_us": statistics.mean(latencies),
+        "p50_us": statistics.median(latencies),
+        "p95_us": statistics.quantiles(latencies, n=20)[18],
+        "p99_us": statistics.quantiles(latencies, n=100)[98],
+        "total_s": total_time,
+    }
+
+
+async def run_async_speculative_orchestration(
+    branch_count: int = 10,
+) -> dict[str, Any]:
+    """Execute asynchronous speculative branching and multiverse collapse."""
+    gc.collect()
+    saver = AsyncRiftCheckpointSaver()
+    graph = create_bench_graph(saver)
+    thread_id = "async-orch-thread"
+    config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
+
+    _ = await graph.ainvoke(
+        {"counter": 0, "data": ["query"], "scratchpad": {}},
+        config=config,
+    )
+
+    runner = RiftRunner(saver=saver)
+    resolver = MultiverseResolver(saver=saver)
+    specs = [
+        BranchSpec(
+            name=f"async_tool_{i}",
+            input_data={"data": [f"async_result_{i}"]},
+        )
+        for i in range(branch_count)
+    ]
+
+    t0 = time.perf_counter()
+    results = await runner.arun_parallel_branches(
+        graph=graph,
+        initial_config=config,
+        branch_specs=specs,
+    )
+    evaluator = HeuristicEvaluator(
+        scorer=lambda r: float(
+            r.output.get("counter", 0) + len(r.output.get("data", []))
+            if r.output
+            else 0.0
+        )
+    )
+    collapse_res = await resolver.acollapse(
+        thread_id=thread_id,
+        results=results,
+        evaluator=evaluator,
+        prune_discarded=True,
+    )
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+
+    return {
+        "branch_count": branch_count,
+        "elapsed_ms": elapsed_ms,
+        "winner": collapse_res.winning_branch,
+        "winner_score": collapse_res.scores[collapse_res.winning_branch].score,
+    }
+
+
+async def run_async_tree_of_thought_search() -> dict[str, Any]:
+    """Execute asynchronous 2-level hierarchical Tree-of-Thought search."""
+    gc.collect()
+    saver = AsyncRiftCheckpointSaver()
+    graph = create_bench_graph(saver)
+    thread_id = "async-tot-session"
+    config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
+
+    _ = await graph.ainvoke(
+        {"counter": 0, "data": ["async_problem"], "scratchpad": {}},
+        config=config,
+    )
+
+    runner = RiftRunner(saver=saver)
+    resolver = MultiverseResolver(saver=saver)
+
+    t0 = time.perf_counter()
+    d1_specs = [
+        BranchSpec(name=f"async_strat_{s}", input_data={"data": [f"strat_{s}_plan"]})
+        for s in ["A", "B", "C"]
+    ]
+    d1_results = await runner.arun_parallel_branches(
+        graph=graph,
+        initial_config=config,
+        branch_specs=d1_specs,
+    )
+
+    evaluator = JSONSchemaEvaluator(required_keys=["counter", "data"])
+    refined_d1_results: dict[str, Any] = {}
+
+    for strat_name, d1_res in d1_results.items():
+        if d1_res.final_config is None:
+            continue
+        strat_tid = str(d1_res.final_config["configurable"]["thread_id"])
+        d2_specs = [
+            BranchSpec(
+                name=f"async_tactic_{t}",
+                input_data={"data": [f"{strat_name}_tactic_{t}_action"]},
+            )
+            for t in [1, 2, 3]
+        ]
+        d2_res = await runner.arun_parallel_branches(
+            graph=graph,
+            initial_config=d1_res.final_config,
+            branch_specs=d2_specs,
+        )
+        tactic_collapse = await resolver.acollapse(
+            thread_id=strat_tid,
+            results=d2_res,
+            evaluator=evaluator,
+            prune_discarded=True,
+        )
+        refined_d1_results[strat_name] = tactic_collapse.winning_result
+
+    final_evaluator = HeuristicEvaluator(
+        scorer=lambda r: float(
+            r.output.get("counter", 0) + len(r.output.get("data", []))
+            if r.output
+            else 0.0
+        )
+    )
+    collapse_res = await resolver.acollapse(
+        thread_id=thread_id,
+        results=refined_d1_results,
+        evaluator=final_evaluator,
+        prune_discarded=True,
+    )
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+
+    return {
+        "total_timelines_explored": 3 + 9,
+        "elapsed_ms": elapsed_ms,
+        "winner": collapse_res.winning_branch,
+        "winner_score": collapse_res.scores[collapse_res.winning_branch].score,
+    }
+
+
+async def run_async_branch_scaling(
+    counts: list[int] | None = None,
+) -> list[dict[str, Any]]:
+    """Measure asynchronous speculative parallel branch execution scaling."""
+    if counts is None:
+        counts = [10, 25, 50, 100]
+
+    saver = AsyncRiftCheckpointSaver()
+    graph = create_bench_graph(saver)
+    root_thread = "async-scaling-root"
+    cfg: RunnableConfig = {"configurable": {"thread_id": root_thread}}
+    await graph.ainvoke({"counter": 0, "data": ["seed"], "scratchpad": {}}, config=cfg)
+
+    runner = RiftRunner(saver=saver)
+    resolver = MultiverseResolver(saver=saver)
+    evaluator = HeuristicEvaluator(
+        scorer=lambda r: float(r.output.get("counter", 0) if r.output else 0.0)
+    )
+
+    results: list[dict[str, Any]] = []
+    for count in counts:
+        gc.collect()
+        specs = [
+            BranchSpec(name=f"b_{i}", input_data={"data": [f"val_{i}"]})
+            for i in range(count)
+        ]
+        t0 = time.perf_counter()
+        b_res = await runner.arun_parallel_branches(
+            graph=graph, initial_config=cfg, branch_specs=specs
+        )
+        _ = await resolver.acollapse(
+            root_thread, b_res, evaluator=evaluator, prune_discarded=True
+        )
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        results.append({"count": count, "ms": elapsed_ms})
+
+    return results
+
+
+async def run_all_async_benchmarks() -> tuple[
+    tuple[
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+    ],
+    list[dict[str, Any]],
+    dict[str, Any],
+    dict[str, Any],
+]:
+    """Execute asynchronous benchmark test suite."""
+    mem_saver = MemorySaver()
+    rift_saver = AsyncRiftCheckpointSaver()
+
+    print("\n[Async 1/5] Async Checkpoint Put Latency (N=1,000 writes)...")
+    async_put_mem = await run_async_put_benchmark(mem_saver, 1000)
+    async_put_rift = await run_async_put_benchmark(rift_saver, 1000)
+
+    print("[Async 2/5] Async Checkpoint Get Lookup Latency (N=1,000 reads)...")
+    async_get_mem = await run_async_get_benchmark(mem_saver, 1000)
+    async_get_rift = await run_async_get_benchmark(rift_saver, 1000)
+
+    print("[Async 3/5] Async Branch Scaling (10, 25, 50, 100 Parallel Universes)...")
+    async_scaling = await run_async_branch_scaling()
+
+    print("[Async 4/5] Async Speculative Orchestration (B=10 Candidates)...")
+    async_orch = await run_async_speculative_orchestration(branch_count=10)
+
+    print("[Async 5/5] Async Tree-of-Thought Search (Depth=2, 12 Timelines)...")
+    async_tot = await run_async_tree_of_thought_search()
+
+    async_micro = (async_put_mem, async_put_rift, async_get_mem, async_get_rift)
+    return async_micro, async_scaling, async_orch, async_tot
+
+
 def _print_micro_benchmarks(
     mem_put: tuple[float, dict[str, float]],
     rift_put: tuple[float, dict[str, float]],
@@ -760,6 +1075,59 @@ def _print_orchestration_and_capabilities(
     )
 
 
+def _print_async_benchmarks(
+    async_micro: tuple[
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+    ],
+    async_scaling: list[dict[str, Any]],
+    async_orch: dict[str, Any],
+    async_tot: dict[str, Any],
+) -> None:
+    """Print asynchronous benchmark performance tables."""
+    mem_put, rift_put, mem_get, rift_get = async_micro
+
+    print("\n5. ⚡ Asynchronous Multiverse Performance (AsyncRiftCheckpointSaver):")
+    print(f"   {'Metric':<24} | {'Standard MemorySaver':<22} | {'AsyncRiftSaver':<22}")
+    print(f"   {'-' * 24} | {'-' * 22} | {'-' * 22}")
+    print(f"   {'Async Put Ops/sec':<24} | {mem_put[0]:<22.1f} | {rift_put[0]:<22.1f}")
+    print(
+        f"   {'Async Put Mean Latency':<24} | {mem_put[1]['mean_us']:<20.2f}µs "
+        f"| {rift_put[1]['mean_us']:<20.2f}µs"
+    )
+    print(
+        f"   {'Async Put p50 Median':<24} | {mem_put[1]['p50_us']:<20.2f}µs "
+        f"| {rift_put[1]['p50_us']:<20.2f}µs"
+    )
+    print(f"   {'Async Get Ops/sec':<24} | {mem_get[0]:<22.1f} | {rift_get[0]:<22.1f}")
+    print(
+        f"   {'Async Get Mean Latency':<24} | {mem_get[1]['mean_us']:<20.2f}µs "
+        f"| {rift_get[1]['mean_us']:<20.2f}µs"
+    )
+    print(
+        f"   {'Async Get p50 Median':<24} | {mem_get[1]['p50_us']:<20.2f}µs "
+        f"| {rift_get[1]['p50_us']:<20.2f}µs"
+    )
+
+    print("\n   Async Speculative Multiverse Pipeline Scaling:")
+    for sc in async_scaling:
+        print(
+            f"   • {sc['count']:<3} Parallel Branches + Score + Collapse: "
+            f"{sc['ms']:<6.2f}ms"
+        )
+
+    print(
+        f"\n   Async Tree-of-Thought Search (12 Timelines): "
+        f"{async_tot['elapsed_ms']:.2f}ms"
+    )
+    print(
+        f"   Async Speculative Tool Collapse (B=10): "
+        f"{async_orch['elapsed_ms']:.2f}ms (Winner: {async_orch['winner']})"
+    )
+
+
 def _print_summary_verdict() -> None:
     """Print the final executive summary verdict."""
     print("\n" + "=" * 86)
@@ -782,6 +1150,10 @@ def _print_summary_verdict() -> None:
         "`Consensus`) + automatic pruning."
     )
     print(
+        " • Async Pipeline Throughput: Ultra-low latency `asyncio.gather` execution "
+        "and collapse in `AsyncRiftCheckpointSaver`."
+    )
+    print(
         " • Time Travel & Tracing: Rewind to any historical moment and "
         "explore counterfactual realities."
     )
@@ -790,6 +1162,49 @@ def _print_summary_verdict() -> None:
         "concurrent agent workers."
     )
     print("=" * 86)
+
+
+def _maybe_generate_charts(
+    fork_results: list[dict[str, Any]],
+    sync_micro: tuple[
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+    ],
+    async_micro: tuple[
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+    ],
+    async_scaling: list[dict[str, Any]],
+) -> None:
+    """Generate high-resolution benchmark visualization figures if requested."""
+    if "--plot" not in sys.argv and "--save-plots" not in sys.argv:
+        return
+
+    try:
+        try:
+            from scripts.generate_benchmark_charts import (  # noqa: PLC0415
+                generate_async_performance_chart,
+                generate_forking_speedup_chart,
+                generate_micro_latency_chart,
+            )
+        except ImportError:
+            from generate_benchmark_charts import (  # type: ignore[import-not-found,no-redef] # noqa: PLC0415
+                generate_async_performance_chart,
+                generate_forking_speedup_chart,
+                generate_micro_latency_chart,
+            )
+
+        mem_put, rift_put, mem_get, rift_get = sync_micro
+        p1 = generate_forking_speedup_chart(fork_results)
+        p2 = generate_micro_latency_chart(mem_put, rift_put, mem_get, rift_get)
+        p3 = generate_async_performance_chart(async_micro, async_scaling)
+        print(f"\n📊 Generated publication-quality figures: {p1}, {p2}, and {p3}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"\n⚠️  Could not generate plots: {exc}")
 
 
 def main() -> None:
@@ -801,35 +1216,43 @@ def main() -> None:
     mem_saver = MemorySaver()
     rift_saver = RiftCheckpointSaver()
 
-    # 1. Micro-Benchmarks
-    print("\n[1/6] Checkpoint Put / Write Latency (N=1,000 writes)...")
+    # 1. Sync Micro-Benchmarks
+    print("\n[Sync 1/6] Checkpoint Put / Write Latency (N=1,000 writes)...")
     mem_put = run_put_benchmark(mem_saver, 1000)
     rift_put = run_put_benchmark(rift_saver, 1000)
 
-    print("[2/6] Checkpoint Get Lookup Latency (N=1,000 reads)...")
+    print("[Sync 2/6] Checkpoint Get Lookup Latency (N=1,000 reads)...")
     mem_get = run_get_benchmark(mem_saver, 1000)
     rift_get = run_get_benchmark(rift_saver, 1000)
 
     # 2. Fork Scaling
     print(
-        "[3/6] Branch Forking Scalability"
+        "[Sync 3/6] Branch Forking Scalability"
         " (Spawning N=100 Universes across State Sizes)..."
     )
     fork_results = run_branch_fork_scaling(100)
 
     # 3. Speculation & Multiverse Exploration
-    print("[4/6] Speculative Tool Execution & Multiverse Collapse (B=10 candidates)...")
+    print(
+        "[Sync 4/6] Speculative Tool Execution & Multiverse Collapse"
+        " (B=10 candidates)..."
+    )
     orch_res = run_speculative_orchestration_comparison(branch_count=10)
 
     print(
-        "[5/6] Tree-of-Thought Hierarchical Search"
+        "[Sync 5/6] Tree-of-Thought Hierarchical Search"
         " (Depth=2, 12 Timelines, Auto-Prune)..."
     )
     tot_res = run_tree_of_thought_multiverse_search()
 
-    print("[6/6] Historical Time-Travel Rewind & Concurrency State Isolation...")
+    print("[Sync 6/6] Historical Time-Travel Rewind & Concurrency State Isolation...")
     tt_res = run_time_travel_rewind_benchmark()
     std_iso, _rift_iso = run_state_isolation_test()
+
+    # 4. Async Benchmarks
+    async_micro, async_scaling, async_orch, async_tot = asyncio.run(
+        run_all_async_benchmarks()
+    )
 
     # PRINT SUMMARY REPORT
     print("\n" + "=" * 86)
@@ -839,26 +1262,16 @@ def main() -> None:
     _print_micro_benchmarks(mem_put, rift_put, mem_get, rift_get)
     _print_fork_scaling(fork_results)
     _print_orchestration_and_capabilities(orch_res, tot_res, tt_res, std_iso=std_iso)
+    _print_async_benchmarks(async_micro, async_scaling, async_orch, async_tot)
     _print_summary_verdict()
 
-    if "--plot" in sys.argv or "--save-plots" in sys.argv:
-        try:
-            try:
-                from generate_benchmark_charts import (  # noqa: PLC0415
-                    generate_forking_speedup_chart,
-                    generate_micro_latency_chart,
-                )
-            except ImportError:
-                from scripts.generate_benchmark_charts import (  # noqa: PLC0415
-                    generate_forking_speedup_chart,
-                    generate_micro_latency_chart,
-                )
-
-            p1 = generate_forking_speedup_chart(fork_results)
-            p2 = generate_micro_latency_chart(mem_put, rift_put, mem_get, rift_get)
-            print(f"\n📊 Generated publication-quality figures: {p1} and {p2}")
-        except Exception as exc:  # noqa: BLE001
-            print(f"\n⚠️  Could not generate plots: {exc}")
+    sync_micro = (mem_put, rift_put, mem_get, rift_get)
+    _maybe_generate_charts(
+        fork_results,
+        sync_micro,
+        async_micro,
+        async_scaling,
+    )
 
 
 if __name__ == "__main__":

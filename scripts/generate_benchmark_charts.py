@@ -243,3 +243,125 @@ def generate_micro_latency_chart(
     plt.savefig(out_p, dpi=300, bbox_inches="tight")
     plt.close(fig)
     return out_p
+
+
+def generate_async_performance_chart(
+    async_micro: tuple[
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+        tuple[float, dict[str, float]],
+    ],
+    async_scaling: list[dict[str, Any]],
+    output_path: Path | str = "docs/images/benchmark_async_performance.png",
+) -> Path:
+    """Generate plots comparing asynchronous checkpoint throughput and branch scaling.
+
+    Args:
+        async_micro: Tuple of (mem_put, rift_put, mem_get, rift_get) stats.
+        async_scaling: List of async parallel branch scaling result dicts.
+        output_path: Destination image path.
+
+    Returns:
+        Path to saved figure.
+    """
+    _apply_plot_theme()
+    out_p = Path(output_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+
+    mem_put, rift_put, mem_get, rift_get = async_micro
+    ops_labels = ["Async Put\n(ops/sec)", "Async Get\n(ops/sec)"]
+    mem_ops = [mem_put[0], mem_get[0]]
+    rift_ops = [rift_put[0], rift_get[0]]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.2))
+    x_indices = range(len(ops_labels))
+    width = 0.35
+
+    # Subplot 1: Async Read/Write Throughput
+    bars1 = ax1.bar(
+        [x - width / 2 for x in x_indices],
+        mem_ops,
+        width,
+        label="Standard MemorySaver (Async)",
+        color="#94a3b8",
+        edgecolor="#64748b",
+        alpha=0.9,
+    )
+    bars2 = ax1.bar(
+        [x + width / 2 for x in x_indices],
+        rift_ops,
+        width,
+        label="AsyncRiftCheckpointSaver",
+        color="#06b6d4",
+        edgecolor="#0891b2",
+        alpha=0.95,
+    )
+
+    ax1.set_ylabel("Throughput (Operations / Second)")
+    ax1.set_title("Async Micro-Op Throughput (N=1,000 Ops)", fontweight="bold")
+    ax1.set_xticks(list(x_indices))
+    ax1.set_xticklabels(ops_labels)
+    ax1.legend(loc="upper left")
+
+    for bar, val in zip(bars1, mem_ops, strict=True):
+        ax1.annotate(
+            f"{val:,.0f} op/s",
+            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+            xytext=(0, 3),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=8.5,
+            fontweight="bold",
+            color="#475569",
+        )
+    for bar, val in zip(bars2, rift_ops, strict=True):
+        ax1.annotate(
+            f"{val:,.0f} op/s",
+            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+            xytext=(0, 3),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=8.5,
+            fontweight="bold",
+            color="#0e7490",
+        )
+
+    # Subplot 2: Parallel Branch Scaling
+    counts = [f"B={r['count']}\nBranches" for r in async_scaling]
+    latencies = [r["ms"] for r in async_scaling]
+    colors = ["#67e8f9", "#22d3ee", "#06b6d4", "#0891b2"]
+
+    bars_sc = ax2.bar(
+        counts,
+        latencies,
+        color=colors,
+        edgecolor="#0e7490",
+        width=0.55,
+    )
+    ax2.set_xlabel("Speculative Concurrency Level")
+    ax2.set_ylabel("Total Latency (ms): Run + Score + Collapse + Prune")
+    ax2.set_title(
+        "Async Speculative Pipeline Latency (RiftRunner + Resolver)",
+        fontweight="bold",
+    )
+
+    for bar, val in zip(bars_sc, latencies, strict=True):
+        ax2.annotate(
+            f"{val:.1f} ms",
+            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+            xytext=(0, 4),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=9.5,
+            fontweight="bold",
+            color="#155e75",
+        )
+
+    plt.tight_layout()
+    plt.savefig(out_p, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    return out_p

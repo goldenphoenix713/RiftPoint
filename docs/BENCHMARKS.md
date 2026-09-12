@@ -152,14 +152,66 @@ winner = resolver.collapse(
 
 ---
 
-### 4. Advanced Multiversal Capabilities (RiftPoint Exclusives)
+### 4. Asynchronous Multiverse Performance (`AsyncRiftCheckpointSaver`)
+
+Evaluates non-blocking asynchronous checkpoint operations (`aput()`, `aget_tuple()`), parallel speculative branch dispatching via `RiftRunner.arun_parallel_branches()`, and asynchronous multiverse collapse via `MultiverseResolver.acollapse()`.
+
+| Metric | Standard `MemorySaver` (Async) | `AsyncRiftCheckpointSaver` | Architectural Context |
+| :--- | :--- | :--- | :--- |
+| **Async Put Throughput** | $103,032.4\text{ ops/s}$ | $67,930.9\text{ ops/s}$ | Non-blocking moment serialization |
+| **Async Put Mean Latency** | $7.55\,\mu\text{s}$ | $12.44\,\mu\text{s}$ | Async lock + Janus Rust logging |
+| **Async Put Median (p50)** | $6.85\,\mu\text{s}$ | $11.40\,\mu\text{s}$ | Sub-microsecond scale consistency |
+| **Async Get Throughput** | $148,195.3\text{ ops/s}$ | $117,277.9\text{ ops/s}$ | High-throughput asynchronous lookup |
+| **Async Get Mean Latency** | $5.77\,\mu\text{s}$ | $7.50\,\mu\text{s}$ | Zero event-loop blocking overhead |
+| **Async Get Median (p50)** | $5.69\,\mu\text{s}$ | $7.40\,\mu\text{s}$ | Sub-$10\,\mu\text{s}$ async tuple reconstitution |
+
+#### Speculative Concurrency Scaling (Async Pipeline)
+
+Measures total end-to-end duration for asynchronous candidate branch dispatch, execution across the state graph, heuristic scoring, winner promotion, and atomic branch pruning:
+
+| Speculative Concurrency Level ($B$) | Total Pipeline Latency (`arun` + `acollapse`) | Effective Branch Throughput |
+| :--- | :--- | :--- |
+| **$B = 10$ Parallel Branches** | $28.30\text{ ms}$ | $353.4\text{ candidate branches/s}$ |
+| **$B = 25$ Parallel Branches** | $65.06\text{ ms}$ | $384.3\text{ candidate branches/s}$ |
+| **$B = 50$ Parallel Branches** | $128.31\text{ ms}$ | $389.7\text{ candidate branches/s}$ |
+| **$B = 100$ Parallel Branches** | $261.88\text{ ms}$ | $381.8\text{ candidate branches/s}$ |
+
+![Asynchronous Multiverse Performance and Pipeline Scaling](images/benchmark_async_performance.png)
+
+#### Asynchronous Speculative Execution Code Pattern
+
+```python
+# Fully non-blocking speculative execution and collapse
+saver = AsyncRiftCheckpointSaver()
+runner = RiftRunner(saver=saver)
+resolver = MultiverseResolver(saver=saver)
+
+# Concurrently explore 10 tool branches in ~25ms
+branch_results = await runner.arun_parallel_branches(
+    graph=graph,
+    initial_config=root_config,
+    branch_specs=specs,
+)
+
+# Score candidates, commit optimal trajectory, and prune discarded branches
+collapse_result = await resolver.acollapse(
+    thread_id=root_thread,
+    results=branch_results,
+    evaluator=evaluator,
+    prune_discarded=True,
+)
+```
+
+---
+
+### 5. Advanced Multiversal Capabilities (RiftPoint Exclusives)
 
 | Capability | Supported in Standard LangGraph | Supported in RiftPoint | Benchmark Performance |
 | :--- | :--- | :--- | :--- |
-| **Tree-of-Thought (ToT) Search** | ❌ Manual thread hacking | **✅ Native Hierarchical Collapse** | 12 timelines in $36.3\text{ ms}$ |
-| **Historical DAG Time Travel** | ❌ Cannot rewind checkpoints | **✅ Native Checkpoint Rewind** | Rewind to Step 3 + 4 counterfactuals in $17.3\text{ ms}$ |
+| **Tree-of-Thought (ToT) Search** | ❌ Manual thread hacking | **✅ Native Hierarchical Collapse** | 12 timelines in $36.1\text{ ms}$ (Async: $34.5\text{ ms}$) |
+| **Historical DAG Time Travel** | ❌ Cannot rewind checkpoints | **✅ Native Checkpoint Rewind** | Rewind to Step 3 + 4 counterfactuals in $17.1\text{ ms}$ |
 | **Concurrency State Safety** | ❌ Shared mutable object leaks | **✅ 100% Isolated** | Zero race conditions across parallel branches |
-| **Lineage DAG Visualization** | ❌ None | **✅ Mermaid & Matplotlib** | 1-line `.visualize()` / `.plot()` |
+| **DAG Lineage Visualization** | ❌ None | **✅ Mermaid & Matplotlib** | 1-line `.visualize()` / `.plot()` |
 | **Full Session SerDe** | ❌ Not available | **✅ Export/Import Snapshot** | Complete session export to JSON / bytes |
 
 ---
@@ -172,11 +224,12 @@ winner = resolver.collapse(
 - Single-threaded prototypes with no alternative path exploration.
 - Lightweight toy scripts where state history, time-travel, and parallel tool calling are not required.
 
-### When to Use RiftPoint (`RiftCheckpointSaver`)
+### When to Use RiftPoint (`RiftCheckpointSaver` / `AsyncRiftCheckpointSaver`)
 
 - **Speculative Tool Routing:** Concurrently querying vector databases, search APIs, and SQL endpoints, committing only the optimal response.
 - **Tree-of-Thought (ToT) / MCTS:** Deep multi-level exploration with automated scoring and pruning of dead branches.
 - **Large Context Agents (RAG / Long Documents):** Sub-millisecond branch forking with zero memory copy penalty.
+- **High-Throughput Asynchronous Pipelines:** Non-blocking async runner dispatching dozens of candidate futures via `asyncio.gather`.
 - **Interactive Time-Travel & Debugging:** Rewinding agent state to historical decision points to test counterfactual reasoning.
 - **Multi-Tenant Concurrent Systems:** Thread-safe state isolation with fine-grained locking.
 
@@ -187,8 +240,8 @@ winner = resolver.collapse(
 To execute the benchmark suite locally:
 
 ```bash
-# Run full benchmark suite
-uv run python scripts/benchmark_comparison.py
+# Run full benchmark suite with publication-quality plot generation
+uv run python scripts/benchmark_comparison.py --plot
 
 # Run automated benchmark regression tests
 uv run pytest tests/test_benchmarks.py -v
