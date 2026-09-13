@@ -44,6 +44,14 @@ Repository = "https://github.com/goldenphoenix713/RiftPoint"
 Issues = "https://github.com/goldenphoenix713/RiftPoint/issues"
 Documentation = "https://github.com/goldenphoenix713/RiftPoint#readme"
 
+[project.optional-dependencies]
+docs = [
+    "mkdocs>=1.6.0,<2.0.0",
+    "mkdocs-material>=9.5.0,<10.0.0",
+    "mkdocstrings[python]>=0.28.0,<1.0.0",
+    "pymdown-extensions>=10.14.0,<11.0.0",
+]
+
 [build-system]
 requires = ["uv_build>=0.10.0,<0.13.0"]
 build-backend = "uv_build"
