@@ -22,7 +22,7 @@ This document presents performance benchmarks comparing standard **LangGraph (`M
 
 ## 🔬 Benchmark Methodology
 
-All benchmarks were executed using [`scripts/benchmark_comparison.py`](../scripts/benchmark_comparison.py) under the following conditions:
+All benchmarks were executed using [`scripts/benchmark_comparison.py`](https://github.com/goldenphoenix713/RiftPoint/blob/main/scripts/benchmark_comparison.py) under the following conditions:
 
 - **Hardware & OS:** Apple Silicon (macOS), Python 3.11
 - **RiftPoint Core:** `janus-tachyon-rs` Rust extension
@@ -94,7 +94,7 @@ Forking Latency Comparison (100 Speculative Branches)
 #### Analysis: $O(N \cdot S)$ Deepcopy vs $O(1)$ Copy-on-Write Pointer Sharing
 
 1. **Standard LangGraph:** Spawning branches requires `copy.deepcopy(parent.checkpoint)`. For 100 branches with a 2MB state, Python must recursively allocate and duplicate $200\text{ MB}$ of in-memory objects, resulting in linear degradation ($O(N \cdot S)$).
-2. **RiftPoint:** Uses **Copy-on-Write (CoW) channel versioning**. When branching across threads/namespaces, [`copy_checkpoint_entry_cross_thread`](../src/riftpoint/checkpointer/base.py) shares identical immutable byte pointers stored in Rust storage. Branch creation executes in **$0.41\text{ ms}$ constant time ($O(1)$)** regardless of context size.
+2. **RiftPoint:** Uses **Copy-on-Write (CoW) channel versioning**. When branching across threads/namespaces, [`copy_checkpoint_entry_cross_thread`](reference/checkpointer.md) shares identical immutable byte pointers stored in Rust storage. Branch creation executes in **$0.41\text{ ms}$ constant time ($O(1)$)** regardless of context size.
 
 ---
 

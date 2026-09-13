@@ -7,9 +7,12 @@ for documentation and performance reporting.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
 
 
 def _apply_plot_theme() -> None:
@@ -468,7 +471,7 @@ def generate_tool_racing_chart(
 
 
 def _plot_peak_memory_bars(
-    ax: plt.Axes,
+    ax: Axes,
     scaling_data: list[dict[str, Any]],
 ) -> None:
     """Plot peak memory allocation bar chart across state sizes."""
@@ -535,7 +538,7 @@ def _plot_peak_memory_bars(
 
 
 def _plot_multicycle_footprint_curve(
-    ax: plt.Axes,
+    ax: Axes,
     cycle_data: dict[str, Any],
 ) -> None:
     """Plot multi-cycle residual memory footprint over 10 consecutive turns."""

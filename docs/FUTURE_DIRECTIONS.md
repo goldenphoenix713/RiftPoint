@@ -25,7 +25,7 @@ This document outlines the strategic engineering roadmap and planned capabilitie
 
 ## 🌲 1. Autonomous Tree Search Orchestrators
 
-While RiftPoint's [`RiftRunner`](../src/riftpoint/runner/multiverse.py) provides 1-hop parallel branching, complex reasoning workflows (such as mathematical deduction, code generation, and multi-step planning) require multi-level heuristic exploration.
+While RiftPoint's [`RiftRunner`](reference/runner.md) provides 1-hop parallel branching, complex reasoning workflows (such as mathematical deduction, code generation, and multi-step planning) require multi-level heuristic exploration.
 
 ### 1.1 `BeamSearchRunner`
 
