@@ -7,6 +7,7 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        args: [--unsafe]
       - id: check-toml
       - id: check-added-large-files
       - id: check-merge-conflict
@@ -27,14 +28,14 @@ repos:
       # Run the formatter
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.15.0
+  - repo: local
     hooks:
       - id: mypy
-        additional_dependencies:
-          - pytest>=9.0.0
-          - pytest-cov>=6.0.0
-        files: ^(src|tests)/
+        name: mypy (strict typecheck)
+        entry: uv run mypy src tests
+        language: system
+        types: [python]
+        pass_filenames: false
 
   - repo: local
     hooks:

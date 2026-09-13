@@ -1,6 +1,6 @@
 [project]
 name = "riftpoint"
-version = "0.1.0"
+version = "1.0.0"
 description = "High-performance multiversal checkpointer for LangGraph powered by Janus-Tachyon-RS"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
@@ -8,10 +8,48 @@ authors = [
     { name = "Eduardo Ruiz", email = "eduardo.j.ruiz@gmail.com" },
 ]
 requires-python = ">=3.11"
+keywords = [
+    "agentic-ai",
+    "checkpointer",
+    "janus",
+    "langchain",
+    "langgraph",
+    "multiverse",
+    "speculative-execution",
+    "state-management",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
 dependencies = [
-    "janus-tachyon-rs>=0.2.1",
-    "langchain-core>=1.6.3",
-    "langgraph>=1.2.11",
+    "janus-tachyon-rs>=0.2.1,<0.3.0",
+    "langchain-core>=1.6.3,<2.0.0",
+    "langgraph>=1.2.11,<2.0.0",
+    "loguru>=0.7.3,<1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/goldenphoenix713/RiftPoint"
+Repository = "https://github.com/goldenphoenix713/RiftPoint"
+Issues = "https://github.com/goldenphoenix713/RiftPoint/issues"
+Documentation = "https://github.com/goldenphoenix713/RiftPoint#readme"
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs>=1.6.0,<2.0.0",
+    "mkdocs-material>=9.5.0,<10.0.0",
+    "mkdocstrings[python]>=0.28.0,<1.0.0",
+    "pymdown-extensions>=10.14.0,<11.0.0",
 ]
 
 [build-system]
@@ -21,13 +59,28 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "certifi>=2026.7.22",
-    "mypy>=2.3.1",
-    "pre-commit>=4.0.0",
-    "pytest>=9.1.1",
-    "pytest-cov>=6.0.0",
-    "radon>=6.0.1",
-    "ruff>=0.16.7",
+    "matplotlib>=3.8.0,<4.0.0",
+    "mypy>=2.3.1,<3.0.0",
+    "pre-commit>=4.0.0,<5.0.0",
+    "pytest>=9.1.1,<10.0.0",
+    "pytest-cov>=6.0.0,<7.0.0",
+    "radon>=6.0.1,<7.0.0",
+    "ruff>=0.16.7,<1.0.0",
 ]
+docs = [
+    "mkdocs>=1.6.0,<2.0.0",
+    "mkdocs-material>=9.5.0,<10.0.0",
+    "mkdocstrings[python]>=0.28.0,<1.0.0",
+    "pymdown-extensions>=10.14.0,<11.0.0",
+]
+
+# ==============================================================================
+# uv Configuration (Supply Chain Defense & Quarantine)
+# ==============================================================================
+[tool.uv]
+# Quarantine buffer: Ignore any package release newer than the cutoff timestamp
+exclude-newer = "2026-09-12T00:00:00Z"
+
 
 # ==============================================================================
 # Ruff Configuration (Linter & Formatter)
@@ -114,10 +167,11 @@ known-first-party = ["riftpoint"]
 
 [tool.ruff.lint.per-file-ignores]
 # Relax assertions and security false positives for tests
-"tests/**/*" = ["S101", "ARG", "FBT", "PLR2004", "S105", "S106", "INP001"]
-"test*" = ["S101", "ARG", "FBT", "PLR2004", "S105", "S106", "INP001"]
-# Allow print statements and standalone script execution in scripts
+"tests/**/*" = ["S101", "ARG", "FBT", "PLR2004", "S105", "S106", "INP001", "SLF001"]
+"test*" = ["S101", "ARG", "FBT", "PLR2004", "S105", "S106", "INP001", "SLF001"]
+# Allow print statements and standalone script execution in scripts & examples
 "scripts/**/*" = ["INP001", "T201"]
+"examples/**/*" = ["INP001", "T201", "S101"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -154,7 +208,7 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
 [[tool.mypy.overrides]]
-module = "radon.*"
+module = ["radon.*", "matplotlib.*"]
 ignore_missing_imports = true
 
 
@@ -190,11 +244,11 @@ addopts = [
     "--cov=src",
     "--cov-report=term-missing",
     "--cov-report=html",
-    "--cov-fail-under=70",
+    "--cov-fail-under=90",
 ]
 
 # ==============================================================================
-# Coverage Configuration (>= 70% requirement)
+# Coverage Configuration (>= 90% requirement)
 # ==============================================================================
 [tool.coverage.run]
 branch = true
@@ -206,7 +260,7 @@ omit = [
 ]
 
 [tool.coverage.report]
-fail_under = 70
+fail_under = 90
 show_missing = true
 skip_covered = false
 exclude_lines = [

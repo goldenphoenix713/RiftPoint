@@ -10,7 +10,8 @@
 
 ### 2.1 Engine Binding & State Isolation
 
-- **Per-Thread Multiverse Instance:** Each LangGraph `thread_id` manages an isolated `janus.MultiverseBase` instance stored in memory.
+- **Per-Session Multiverse Instance:** Each primary LangGraph session (`thread_id`) manages an isolated `janus.MultiverseBase` instance stored in memory.
+- **Intra-Multiverse Speculative Branching:** Speculative workers and candidate timelines fork as branches *inside* that session's `MultiverseBase` DAG rather than spawning separate multiverses. This allows workers to share historical checkpoints with zero memory duplication.
 - **Tachyon-RS Zero-Copy Diffing:** States are recorded as structural diffs inside Tachyon-RS, preventing full memory duplication when branching into dozens of speculative timelines.
 - **Export & Import:** In-memory multiverses support export/import to JSON, MsgPack, and binary streams for persistence and distributed debugging.
 
@@ -18,9 +19,10 @@
 
 - **Dual Sync/Async Support:** Full implementation of both `BaseCheckpointSaver` and `AsyncCheckpointSaver` protocols from `langgraph.checkpoint.base`.
 - **Checkpoint Mapping:**
-  - `thread_id`: Maps to a specific multiverse DAG in Janus.
+  - `thread_id`: Maps to a specific multiverse DAG in Janus (or a named branch within that multiverse).
   - `checkpoint_id`: Maps to a specific node/commit in the Janus multiverse tree.
   - `parent_config`: Tracks ancestry for branching and time travel.
+  - `checkpoint_ns`: Namespaces subgraphs or isolated worker branch trajectories within the same multiverse.
   - `pending_writes`: Intermediate node writes are buffered per checkpoint.
 
 ### 2.3 Branching & Speculative Runner (`RiftRunner`)

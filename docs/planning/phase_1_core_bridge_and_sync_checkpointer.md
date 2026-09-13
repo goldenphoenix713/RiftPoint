@@ -31,7 +31,8 @@ Establish the fundamental integration layer between **LangGraph** and the Rust-b
 
 ### 2.2 Janus State Representation
 
-- Each `thread_id` maintains an instance of `janus.MultiverseBase`.
+- Each primary session `thread_id` maintains an instance of `janus.MultiverseBase`.
+- Speculative branches and worker trajectories branch directly inside that `MultiverseBase` DAG.
 - Checkpoints are saved as state commits in the multiverse DAG.
 - Diffing and branch points are managed with zero-copy semantics inside the Rust core.
 

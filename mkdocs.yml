@@ -1,0 +1,121 @@
+site_name: RiftPoint
+site_description: High-performance multiversal checkpointer for LangGraph powered by Janus-Tachyon-RS
+site_author: Eduardo Ruiz
+site_url: https://riftpoint.readthedocs.io/
+repo_name: goldenphoenix713/RiftPoint
+repo_url: https://github.com/goldenphoenix713/RiftPoint
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_root_toc_entry: true
+            show_source: true
+            heading_level: 2
+            members_order: source
+            separate_signature: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Core Concepts: getting-started/concepts.md
+  - User Guides:
+      - Synchronous Checkpointer: guides/sync-checkpointer.md
+      - Asynchronous Checkpointer: guides/async-checkpointer.md
+      - Speculative Tool Racing: guides/speculative-racing.md
+      - Multiverse Collapse: guides/multiverse-collapse.md
+      - DAG Time Travel & Replay: guides/time-travel.md
+      - Visualization & Tracing: guides/visualization.md
+      - Snapshot Serialization: guides/serialization.md
+  - Benchmarks & Performance: BENCHMARKS.md
+  - Cookbooks & Examples: examples.md
+  - API Reference:
+      - riftpoint.checkpointer: reference/checkpointer.md
+      - riftpoint.runner: reference/runner.md
+      - riftpoint.runner.beam: reference/beam_search.md
+      - riftpoint.decorators: reference/decorators.md
+      - riftpoint.collapse: reference/collapse.md
+      - riftpoint.serde: reference/serde.md
+      - riftpoint.visualization: reference/visualization.md
+  - Architecture & Planning:
+      - Overview: planning/README.md
+      - Master Plan: planning/overview_plan.md
+      - Phase 1 (Sync Core): planning/phase_1_core_bridge_and_sync_checkpointer.md
+      - Phase 2 (Async Core): planning/phase_2_async_checkpointer.md
+      - Phase 3 (Branching): planning/phase_3_branching_and_speculative_runner.md
+      - Phase 4 (Collapse): planning/phase_4_multiverse_collapse_and_evaluation.md
+      - Phase 5 (Visualization): planning/phase_5_visualization_and_serialization.md
+  - Roadmap & Future Directions:
+      - Roadmap to v1.0: ROADMAP_V1.md
+      - Future Directions: FUTURE_DIRECTIONS.md

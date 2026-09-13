@@ -23,14 +23,16 @@ In standard LLM agent workflows, exploring alternative reasoning paths, evaluati
 
 ## 📚 Planning & Architecture Documentation
 
-Detailed architectural blueprints and implementation phases are documented in [docs/planning](file:///Users/eduardo.ruiz/PycharmProjects/RiftPoint/docs/planning/README.md):
+Detailed architectural blueprints and implementation phases are documented in [docs/planning](docs/planning/README.md):
 
-- **[Master Architecture & Overview Plan](file:///Users/eduardo.ruiz/PycharmProjects/RiftPoint/docs/planning/overview_plan.md)**
-- **[Phase 1: Core Janus Bridge & Sync Checkpointer](file:///Users/eduardo.ruiz/PycharmProjects/RiftPoint/docs/planning/phase_1_core_bridge_and_sync_checkpointer.md)**
-- **[Phase 2: Asynchronous Checkpointer](file:///Users/eduardo.ruiz/PycharmProjects/RiftPoint/docs/planning/phase_2_async_checkpointer.md)**
-- **[Phase 3: Branching & Speculative Execution Engine](file:///Users/eduardo.ruiz/PycharmProjects/RiftPoint/docs/planning/phase_3_branching_and_speculative_runner.md)**
-- **[Phase 4: Multiverse Collapse & Evaluation Engine](file:///Users/eduardo.ruiz/PycharmProjects/RiftPoint/docs/planning/phase_4_multiverse_collapse_and_evaluation.md)**
-- **[Phase 5: Visualization, Serialization & Tracing](file:///Users/eduardo.ruiz/PycharmProjects/RiftPoint/docs/planning/phase_5_visualization_and_serialization.md)**
+- **[Master Architecture & Overview Plan](docs/planning/overview_plan.md)**
+- **[Performance Benchmarks & Multiverse Capability Report](docs/BENCHMARKS.md)**
+- **[Future Directions & Strategic Roadmap](docs/FUTURE_DIRECTIONS.md)**
+- **[Phase 1: Core Janus Bridge & Sync Checkpointer](docs/planning/phase_1_core_bridge_and_sync_checkpointer.md)**
+- **[Phase 2: Asynchronous Checkpointer](docs/planning/phase_2_async_checkpointer.md)**
+- **[Phase 3: Branching & Speculative Execution Engine](docs/planning/phase_3_branching_and_speculative_runner.md)**
+- **[Phase 4: Multiverse Collapse & Evaluation Engine](docs/planning/phase_4_multiverse_collapse_and_evaluation.md)**
+- **[Phase 5: Visualization, Serialization & Tracing](docs/planning/phase_5_visualization_and_serialization.md)**
 
 ---
 
@@ -96,9 +98,17 @@ uv run python scripts/check_radon.py src
 
 ---
 
+## 📚 Documentation & Roadmap
+
+- **[Documentation Site](https://riftpoint.readthedocs.io/):** Full guides, API reference, and tutorials.
+- **[Roadmap to v1.0](docs/ROADMAP_V1.md):** 5-pillar production readiness checklist toward GA release.
+- **[Future Directions](docs/FUTURE_DIRECTIONS.md):** Long-term vision and feature exploration horizon.
+
+---
+
 ## 📄 License
 
 This project is dual-licensed under:
 
-- **MIT License** ([LICENSE-MIT](file:///Users/eduardo.ruiz/PycharmProjects/RiftPoint/LICENSE-MIT))
-- **Apache License, Version 2.0** ([LICENSE-APACHE](file:///Users/eduardo.ruiz/PycharmProjects/RiftPoint/LICENSE-APACHE))
+- **MIT License** ([LICENSE-MIT](LICENSE-MIT))
+- **Apache License, Version 2.0** ([LICENSE-APACHE](LICENSE-APACHE))

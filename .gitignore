@@ -146,16 +146,9 @@ ref/
 # ==========================================
 # Scratch / Temporary Test Files
 # ==========================================
-# Ignore scratch files and scripts starting with "test"
-test*
-
-# Allow pytest test directories and test files
-!tests/
-!tests/**
-!test/
-!test/**
-!**/tests/**
-!**/test/**
+/scratch/
+/test_*.py
+/test.*
 
 # ==========================================
 # Node.js / Tooling (markdownlint, npm, etc.)

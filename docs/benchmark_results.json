@@ -1,0 +1,162 @@
+{
+  "timestamp": "2026-09-12T23:27:53.011255+00:00",
+  "platform": "macOS-26.4-x86_64-i386-64bit",
+  "python_version": "3.11.8 (v3.11.8:db85d51d3e, Feb  6 2024, 18:02:37) [Clang 13.0.0 (clang-1300.0.29.30)]",
+  "sync_micro": {
+    "mem_put_ops": 82839.06006062926,
+    "rift_put_ops": 59638.82729411588,
+    "mem_put_mean_us": 9.398639958817512,
+    "rift_put_mean_us": 14.2996099384618,
+    "mem_get_ops": 122836.99442648812,
+    "rift_get_ops": 91361.41312826175,
+    "mem_get_mean_us": 6.8981299045844935,
+    "rift_get_mean_us": 9.589740075170994
+  },
+  "async_micro": {
+    "mem_put_ops": 102216.08561144285,
+    "rift_put_ops": 66893.14456709631,
+    "mem_get_ops": 133464.19942659192,
+    "rift_get_ops": 11451.38559887134
+  },
+  "fork_scaling": [
+    {
+      "payload_kb": 10,
+      "std_ms": 1.045901000907179,
+      "rift_ms": 0.14015099804964848,
+      "speedup": 7.4626725136603635,
+      "std_forks_sec": 19122.268725866674,
+      "rift_forks_sec": 142703.22921935242
+    },
+    {
+      "payload_kb": 100,
+      "std_ms": 4.556118001346476,
+      "rift_ms": 0.11753799844882451,
+      "speedup": 38.762936764915125,
+      "std_forks_sec": 4389.701933551627,
+      "rift_forks_sec": 170157.73846708736
+    },
+    {
+      "payload_kb": 500,
+      "std_ms": 21.166614998946898,
+      "rift_ms": 0.11632899986580014,
+      "speedup": 181.9547578279294,
+      "std_forks_sec": 944.884196221033,
+      "rift_forks_sec": 171926.17509883578
+    },
+    {
+      "payload_kb": 2000,
+      "std_ms": 83.40997199775302,
+      "rift_ms": 0.11339399861753918,
+      "speedup": 735.5766003021222,
+      "std_forks_sec": 239.7794834476,
+      "rift_forks_sec": 176376.1772565846
+    }
+  ],
+  "speculative_orchestration": {
+    "std_ms": 48.65572100243298,
+    "rift_ms": 48.65114499989431,
+    "std_mem_kb": 281.8349609375,
+    "rift_mem_kb": 283.4501953125,
+    "winner": "tool_cand_0",
+    "winner_score": 7.0
+  },
+  "tree_of_thought": {
+    "total_timelines_explored": 12,
+    "elapsed_ms": 37.78861699902336,
+    "winner": "strategy_A",
+    "winner_score": 7.0,
+    "mermaid_lines": 12
+  },
+  "tool_racing": {
+    "sequential_ms": 246.2134099987452,
+    "parallel_ms": 95.39937199951964,
+    "speedup": 2.580870343674641,
+    "winner": "web_search",
+    "winner_score": 9.2,
+    "strategies": [
+      {
+        "name": "Local Cache",
+        "latency_ms": 5.0,
+        "score": 5.0,
+        "is_winner": false
+      },
+      {
+        "name": "Vector Search",
+        "latency_ms": 35.0,
+        "score": 7.5,
+        "is_winner": false
+      },
+      {
+        "name": "Postgres SQL",
+        "latency_ms": 45.0,
+        "score": 8.0,
+        "is_winner": false
+      },
+      {
+        "name": "Speculative LLM",
+        "latency_ms": 60.0,
+        "score": 8.5,
+        "is_winner": false
+      },
+      {
+        "name": "Web Search (Live)",
+        "latency_ms": 85.0,
+        "score": 9.2,
+        "is_winner": true
+      }
+    ]
+  },
+  "memory_profiling": {
+    "size_scaling": [
+      {
+        "size_kb": 100,
+        "std_peak_kb": 940.900390625,
+        "rift_peak_kb": 259.408203125,
+        "ratio": 3.6271034581416535
+      },
+      {
+        "size_kb": 500,
+        "std_peak_kb": 4316.6513671875,
+        "rift_peak_kb": 531.2294921875,
+        "ratio": 8.12577507587609
+      },
+      {
+        "size_kb": 2000,
+        "std_peak_kb": 17211.248046875,
+        "rift_peak_kb": 2050.65234375,
+        "ratio": 8.393059944720335
+      }
+    ],
+    "cycles": {
+      "rift_finals_kb": [
+        111.490234375,
+        129.5078125,
+        129.951171875,
+        146.732421875,
+        164.267578125,
+        157.8359375,
+        172.9765625,
+        191.4609375,
+        177.744140625,
+        196.25390625
+      ],
+      "std_finals_kb": [
+        76.3583984375,
+        140.2431640625,
+        203.625,
+        262.6484375,
+        316.4267578125,
+        370.3828125,
+        442.337890625,
+        496.0625,
+        558.482421875,
+        612.083984375
+      ],
+      "gc_delta": [
+        0,
+        5,
+        3
+      ]
+    }
+  }
+}
