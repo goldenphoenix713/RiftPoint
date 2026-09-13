@@ -134,4 +134,4 @@ def research_step(state: AgentState) -> AgentState:
 - [x] **Phase 2:** Production Cookbooks (`examples/` directory)
 - [x] **Phase 3:** Edge-Case Hardening & Coverage Boost ($\ge 95\%$)
 - [x] **Phase 4:** GitHub Actions PyPI Publishing & Multi-OS CI Workflow
-- [ ] **Phase 5:** Formal `v1.0.0` Release Tag & PyPI Publication
+- [x] **Phase 5:** Formal `v1.0.0` Release Tag & PyPI Publication
