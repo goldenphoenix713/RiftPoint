@@ -17,10 +17,14 @@ from riftpoint.collapse import (
 )
 from riftpoint.logger import logger
 from riftpoint.runner import (
+    BeamSearchConfig,
+    BeamSearchResult,
+    BeamSearchRunner,
     BranchInfo,
     BranchManager,
     BranchResult,
     BranchSpec,
+    DepthSummary,
     RiftRunner,
 )
 from riftpoint.serde import (
@@ -42,12 +46,16 @@ __all__ = [
     "AsyncRiftCheckpointSaver",
     "BaseEvaluator",
     "BaseRiftSaver",
+    "BeamSearchConfig",
+    "BeamSearchResult",
+    "BeamSearchRunner",
     "BranchInfo",
     "BranchManager",
     "BranchResult",
     "BranchSpec",
     "CollapseResult",
     "ConsensusEvaluator",
+    "DepthSummary",
     "EvaluationResult",
     "HeuristicEvaluator",
     "JSONSchemaEvaluator",
