@@ -103,6 +103,7 @@ nav:
       - riftpoint.checkpointer: reference/checkpointer.md
       - riftpoint.runner: reference/runner.md
       - riftpoint.runner.beam: reference/beam_search.md
+      - riftpoint.decorators: reference/decorators.md
       - riftpoint.collapse: reference/collapse.md
       - riftpoint.serde: reference/serde.md
       - riftpoint.visualization: reference/visualization.md

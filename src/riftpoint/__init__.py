@@ -15,6 +15,7 @@ from riftpoint.collapse import (
     LLMJudgeEvaluator,
     MultiverseResolver,
 )
+from riftpoint.decorators import SpeculativeRaceMeta, speculative_node
 from riftpoint.logger import logger
 from riftpoint.runner import (
     BeamSearchConfig,
@@ -64,6 +65,7 @@ __all__ = [
     "RiftCheckpointSaver",
     "RiftRunner",
     "SessionSnapshot",
+    "SpeculativeRaceMeta",
     "__version__",
     "export_session_bytes",
     "export_session_json",
@@ -74,4 +76,5 @@ __all__ = [
     "logger",
     "plot_multiverse",
     "render_mermaid",
+    "speculative_node",
 ]
