@@ -99,6 +99,7 @@ nav:
       - Visualization & Tracing: guides/visualization.md
       - Snapshot Serialization: guides/serialization.md
   - Benchmarks & Performance: BENCHMARKS.md
+  - Cookbooks & Examples: examples.md
   - API Reference:
       - riftpoint.checkpointer: reference/checkpointer.md
       - riftpoint.runner: reference/runner.md
