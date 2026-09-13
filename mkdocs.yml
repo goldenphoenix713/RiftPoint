@@ -113,4 +113,6 @@ nav:
       - Phase 3 (Branching): planning/phase_3_branching_and_speculative_runner.md
       - Phase 4 (Collapse): planning/phase_4_multiverse_collapse_and_evaluation.md
       - Phase 5 (Visualization): planning/phase_5_visualization_and_serialization.md
-  - Roadmap & Future Directions: FUTURE_DIRECTIONS.md
+  - Roadmap & Future Directions:
+      - Roadmap to v1.0: ROADMAP_V1.md
+      - Future Directions: FUTURE_DIRECTIONS.md

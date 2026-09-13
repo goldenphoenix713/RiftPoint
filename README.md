@@ -98,6 +98,14 @@ uv run python scripts/check_radon.py src
 
 ---
 
+## 📚 Documentation & Roadmap
+
+- **[Documentation Site](https://riftpoint.readthedocs.io/):** Full guides, API reference, and tutorials.
+- **[Roadmap to v1.0](docs/ROADMAP_V1.md):** 5-pillar production readiness checklist toward GA release.
+- **[Future Directions](docs/FUTURE_DIRECTIONS.md):** Long-term vision and feature exploration horizon.
+
+---
+
 ## 📄 License
 
 This project is dual-licensed under:

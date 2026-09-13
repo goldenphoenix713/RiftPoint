@@ -35,6 +35,7 @@ Welcome to the planning and architecture hub for **RiftPoint**, the multiversal 
 
 ---
 
-## 🚀 Strategic Roadmap
+## 🚀 Strategic Roadmap & Future Directions
 
-- **[Future Directions & Strategic Roadmap](../FUTURE_DIRECTIONS.md):** Autonomous tree search (Beam Search / MCTS), `@speculative_node` decorators, Pareto & consensus evaluators, timeline diffing, interactive visualizers, and streaming.
+- **[Roadmap to v1.0 (General Availability)](../ROADMAP_V1.md):** 5-pillar production readiness checklist covering autonomous tree search, declarative ergonomics, cookbooks, $\ge 95\%$ test hardening, and multi-OS CI/CD PyPI release.
+- **[Future Directions & Architecture Horizon](../FUTURE_DIRECTIONS.md):** Autonomous tree search (Beam Search / MCTS), `@speculative_node` decorators, Pareto & consensus evaluators, timeline diffing, interactive visualizers, and streaming.
