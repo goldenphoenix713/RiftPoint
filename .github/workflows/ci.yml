@@ -43,7 +43,7 @@ jobs:
         run: uv run python scripts/check_radon.py src
 
       - name: Markdownlint Check
-        uses: DavidAnson/markdownlint-cli2-action@v19
+        uses: DavidAnson/markdownlint-cli2-action@v24
         with:
           config: ".markdownlint.json"
           globs: |
