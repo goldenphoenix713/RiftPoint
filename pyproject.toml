@@ -1,6 +1,6 @@
 [project]
 name = "riftpoint"
-version = "0.1.0"
+version = "1.0.0"
 description = "High-performance multiversal checkpointer for LangGraph powered by Janus-Tachyon-RS"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
@@ -19,13 +19,14 @@ keywords = [
     "state-management",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
@@ -235,11 +236,11 @@ addopts = [
     "--cov=src",
     "--cov-report=term-missing",
     "--cov-report=html",
-    "--cov-fail-under=70",
+    "--cov-fail-under=90",
 ]
 
 # ==============================================================================
-# Coverage Configuration (>= 70% requirement)
+# Coverage Configuration (>= 90% requirement)
 # ==============================================================================
 [tool.coverage.run]
 branch = true
@@ -251,7 +252,7 @@ omit = [
 ]
 
 [tool.coverage.report]
-fail_under = 70
+fail_under = 90
 show_missing = true
 skip_covered = false
 exclude_lines = [

@@ -132,6 +132,6 @@ def research_step(state: AgentState) -> AgentState:
 
 - [x] **Phase 1:** Core Additions (`BeamSearchRunner` & `@speculative_node`)
 - [x] **Phase 2:** Production Cookbooks (`examples/` directory)
-- [ ] **Phase 3:** Edge-Case Hardening & Coverage Boost ($\ge 95\%$)
-- [ ] **Phase 4:** GitHub Actions PyPI Publishing & Multi-OS CI Workflow
+- [x] **Phase 3:** Edge-Case Hardening & Coverage Boost ($\ge 95\%$)
+- [x] **Phase 4:** GitHub Actions PyPI Publishing & Multi-OS CI Workflow
 - [ ] **Phase 5:** Formal `v1.0.0` Release Tag & PyPI Publication

@@ -15,7 +15,11 @@ from riftpoint.collapse import (
     LLMJudgeEvaluator,
     MultiverseResolver,
 )
-from riftpoint.decorators import SpeculativeRaceMeta, speculative_node
+from riftpoint.decorators import (
+    SpeculativeNodeConfig,
+    SpeculativeRaceMeta,
+    speculative_node,
+)
 from riftpoint.logger import logger
 from riftpoint.runner import (
     BeamSearchConfig,
@@ -42,7 +46,7 @@ from riftpoint.visualization import (
     render_mermaid,
 )
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 __all__ = [
     "AsyncRiftCheckpointSaver",
     "BaseEvaluator",
@@ -65,6 +69,7 @@ __all__ = [
     "RiftCheckpointSaver",
     "RiftRunner",
     "SessionSnapshot",
+    "SpeculativeNodeConfig",
     "SpeculativeRaceMeta",
     "__version__",
     "export_session_bytes",
